@@ -220,6 +220,20 @@ export function useTradingJournal() {
   const currentBalance = initialBalance + totalPnL;
   const growthPercent = initialBalance > 0 ? (totalPnL / initialBalance) * 100 : 0;
 
+  // Auto sync balance & portfolio settings to Firebase whenever initialBalance, leverage, currency, or totalPnL updates
+  useEffect(() => {
+    if (isLoaded && firebaseService.isConfigured()) {
+      firebaseService.saveSettings({
+        initialBalance,
+        currentBalance,
+        totalPnL,
+        leverage,
+        currency
+      });
+    }
+  }, [initialBalance, currentBalance, totalPnL, leverage, currency, isLoaded]);
+
+
   const exportJSON = () => {
     const exportData = {
       version: 1,

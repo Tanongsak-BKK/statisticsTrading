@@ -60,25 +60,44 @@ export const firebaseService = {
     }
   },
 
-  // Save portfolio settings (Initial Balance, Leverage, Currency)
-  saveSettings: async (settings: { initialBalance: number; leverage: number; currency: string }) => {
+  // Save portfolio settings (Initial Balance, Current Balance, Total PnL, Leverage, Currency)
+  saveSettings: async (settings: {
+    initialBalance: number;
+    currentBalance?: number;
+    totalPnL?: number;
+    leverage: number;
+    currency: string;
+  }) => {
     if (!db || !isFirebaseConfigured) return;
     try {
       const docRef = doc(db, SETTINGS_COLLECTION, DEFAULT_SETTINGS_DOC);
-      await setDoc(docRef, settings, { merge: true });
+      await setDoc(
+        docRef,
+        {
+          ...settings,
+          updatedAt: new Date().toISOString()
+        },
+        { merge: true }
+      );
     } catch (err) {
       console.error('Error saving settings to Firebase:', err);
     }
   },
 
-  // Fetch portfolio settings
+  // Fetch portfolio settings from Firestore
   fetchSettings: async () => {
     if (!db || !isFirebaseConfigured) return null;
     try {
       const docRef = doc(db, SETTINGS_COLLECTION, DEFAULT_SETTINGS_DOC);
       const snapshot = await getDoc(docRef);
       if (snapshot.exists()) {
-        return snapshot.data() as { initialBalance?: number; leverage?: number; currency?: string };
+        return snapshot.data() as {
+          initialBalance?: number;
+          currentBalance?: number;
+          totalPnL?: number;
+          leverage?: number;
+          currency?: string;
+        };
       }
       return null;
     } catch (err) {
@@ -86,4 +105,5 @@ export const firebaseService = {
       return null;
     }
   }
+
 };
