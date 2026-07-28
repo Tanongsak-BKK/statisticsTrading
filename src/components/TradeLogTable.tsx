@@ -67,9 +67,10 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
             onChange={(e) => setOutcomeFilter(e.target.value)}
           >
             <option value="ALL">ทุกผลลัพธ์</option>
-            <option value="WIN">กำไร (Win)</option>
-            <option value="LOSS">ขาดทุน (Loss)</option>
-            <option value="BREAKEVEN">เสมอตัว (Breakeven)</option>
+            <option value="OPEN">🔵 ถือออเดอร์อยู่ (Open)</option>
+            <option value="WIN">🟢 กำไร (Win)</option>
+            <option value="LOSS">🔴 ขาดทุน (Loss)</option>
+            <option value="BREAKEVEN">⚪ เสมอตัว (Breakeven)</option>
           </select>
         </div>
       </div>
@@ -106,7 +107,7 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
                 )}`;
 
                 const pnlClass =
-                  t.pnl > 0 ? 'text-success' : t.pnl < 0 ? 'text-danger' : '';
+                  t.pnl > 0 ? 'text-success' : t.pnl < 0 ? 'text-danger' : 'text-muted';
 
                 return (
                   <tr key={t.id}>
@@ -131,7 +132,7 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
                       <strong>{t.lotSize}</strong>
                     </td>
                     <td>
-                      {t.entryPrice} &rarr; {t.exitPrice}
+                      {t.entryPrice} &rarr; {t.exitPrice !== null ? t.exitPrice : <span className="text-amber-400 font-semibold">(Open)</span>}
                     </td>
                     <td>
                       <div className="text-xs">
@@ -161,23 +162,33 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
                       </div>
                     </td>
                     <td className={pnlClass}>
-                      <strong>{formatCurrency(t.pnl, currency)}</strong>
-                      <div className="text-xs">
-                        {t.pnlPercent >= 0 ? '+' : ''}
-                        {t.pnlPercent}%{' '}
-                        <span
-                          className={`badge ${
-                            t.outcome === 'WIN'
-                              ? 'badge-outcome-win'
-                              : t.outcome === 'LOSS'
-                              ? 'badge-outcome-loss'
-                              : 'badge-outcome-be'
-                          }`}
-                        >
-                          {t.outcome === 'WIN' ? 'WIN' : t.outcome === 'LOSS' ? 'LOSS' : 'BE'}
-                        </span>
-                      </div>
+                      {t.outcome === 'OPEN' ? (
+                        <div>
+                          <span className="badge badge-info">🔵 OPEN</span>
+                          <div className="text-[11px] text-muted mt-0.5">ถือออเดอร์อยู่</div>
+                        </div>
+                      ) : (
+                        <>
+                          <strong>{formatCurrency(t.pnl, currency)}</strong>
+                          <div className="text-xs">
+                            {t.pnlPercent >= 0 ? '+' : ''}
+                            {t.pnlPercent}%{' '}
+                            <span
+                              className={`badge ${
+                                t.outcome === 'WIN'
+                                  ? 'badge-outcome-win'
+                                  : t.outcome === 'LOSS'
+                                  ? 'badge-outcome-loss'
+                                  : 'badge-outcome-be'
+                              }`}
+                            >
+                              {t.outcome === 'WIN' ? 'WIN' : t.outcome === 'LOSS' ? 'LOSS' : 'BE'}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </td>
+
                     <td>
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button

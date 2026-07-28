@@ -173,7 +173,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     e.preventDefault();
 
     const entry = parseFloat(entryPrice);
-    const exit = parseFloat(exitPrice);
+    const exit = exitPrice !== '' ? parseFloat(exitPrice) : null;
     const lot = parseFloat(lotSize);
     const orders = parseInt(orderCount) || 1;
     const userPnl = manualPnl !== '' ? parseFloat(manualPnl) : null;
@@ -202,6 +202,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     onSave(trade);
     onClose();
   };
+
 
   return (
     <div className="modal-overlay open" onClick={(e) => {
@@ -306,17 +307,19 @@ export const TradeModal: React.FC<TradeModalProps> = ({
 
             {/* Exit Price */}
             <div className="form-group">
-              <label htmlFor="field-exit">ราคาออก (Exit Price) <span className="required">*</span></label>
+              <label htmlFor="field-exit">
+                ราคาออก (Exit Price) <span className="text-muted font-normal text-xs">(เว้นว่างไว้หากออเดอร์ยังเปิดอยู่)</span>
+              </label>
               <input
                 type="number"
                 id="field-exit"
                 step="any"
-                placeholder="0.00"
+                placeholder="0.00 (เว้นว่างเพื่อบันทึกเป็น Open Order)"
                 value={exitPrice}
                 onChange={(e) => setExitPrice(e.target.value)}
-                required
               />
             </div>
+
 
             {/* Real-time Leverage & Margin Live Calculator Box */}
             {lotNum > 0 && (

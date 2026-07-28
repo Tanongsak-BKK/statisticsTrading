@@ -46,7 +46,7 @@ export function getContractSize(symbol: string): number {
 
 export function calculateTradeMetrics(
   entry: number,
-  exit: number,
+  exit: number | null,
   lot: number,
   dir: Direction,
   sl: number | null,
@@ -56,29 +56,33 @@ export function calculateTradeMetrics(
 ) {
   const contractSize = getContractSize(symbol);
   let pnl = 0;
-
-  if (userPnl !== null && !isNaN(userPnl)) {
-    pnl = userPnl;
-  } else {
-    if (dir === 'BUY') {
-      pnl = (exit - entry) * lot * contractSize;
-    } else {
-      pnl = (entry - exit) * lot * contractSize;
-    }
-  }
-
   let pnlPercent = 0;
-  if (entry > 0) {
-    if (dir === 'BUY') {
-      pnlPercent = ((exit - entry) / entry) * 100;
-    } else {
-      pnlPercent = ((entry - exit) / entry) * 100;
-    }
-  }
+  let outcome: Outcome = 'OPEN';
 
-  let outcome: Outcome = 'BREAKEVEN';
-  if (pnl > 0.0001) outcome = 'WIN';
-  else if (pnl < -0.0001) outcome = 'LOSS';
+  // If exit price is provided, order is CLOSED -> Calculate final PnL and outcome
+  if (exit !== null && !isNaN(exit)) {
+    if (userPnl !== null && !isNaN(userPnl)) {
+      pnl = userPnl;
+    } else {
+      if (dir === 'BUY') {
+        pnl = (exit - entry) * lot * contractSize;
+      } else {
+        pnl = (entry - exit) * lot * contractSize;
+      }
+    }
+
+    if (entry > 0) {
+      if (dir === 'BUY') {
+        pnlPercent = ((exit - entry) / entry) * 100;
+      } else {
+        pnlPercent = ((entry - exit) / entry) * 100;
+      }
+    }
+
+    if (pnl > 0.0001) outcome = 'WIN';
+    else if (pnl < -0.0001) outcome = 'LOSS';
+    else outcome = 'BREAKEVEN';
+  }
 
   let rr = 0;
   if (sl && tp && sl !== entry) {
@@ -97,6 +101,7 @@ export function calculateTradeMetrics(
     contractSize
   };
 }
+
 
 
 export function formatCurrency(val: number, currency: CurrencyUnit = '$'): string {

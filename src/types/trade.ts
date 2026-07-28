@@ -1,5 +1,5 @@
 export type Direction = 'BUY' | 'SELL';
-export type Outcome = 'WIN' | 'LOSS' | 'BREAKEVEN';
+export type Outcome = 'WIN' | 'LOSS' | 'BREAKEVEN' | 'OPEN';
 export type CurrencyUnit = '$' | '฿' | 'pt';
 
 export interface Trade {
@@ -9,7 +9,7 @@ export interface Trade {
   direction: Direction;
   lotSize: number;
   entryPrice: number;
-  exitPrice: number;
+  exitPrice: number | null;
   stopLoss: number | null;
   takeProfit: number | null;
   orderCount: number;
