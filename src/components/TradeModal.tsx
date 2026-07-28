@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trade, Direction, CurrencyUnit } from '@/types/trade';
 import { calculateTradeMetrics, calculateRequiredMargin, calculateMaxLot, formatCurrency } from '@/utils/tradeUtils';
-import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText, Gauge } from 'lucide-react';
+import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText, Gauge, Calculator } from 'lucide-react';
 
 interface TradeModalProps {
   isOpen: boolean;
@@ -15,6 +15,8 @@ interface TradeModalProps {
   currency?: CurrencyUnit;
 }
 
+export type SLTPInputMode = 'PRICE' | 'POINTS';
+
 export const TradeModal: React.FC<TradeModalProps> = ({
   isOpen,
   onClose,
@@ -24,7 +26,6 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   leverage = 100,
   currency = '$'
 }) => {
-
   const getDefaultDateTime = () => {
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -38,11 +39,17 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   const [lotSize, setLotSize] = useState<string>('');
   const [entryPrice, setEntryPrice] = useState<string>('');
   const [exitPrice, setExitPrice] = useState<string>('');
-  const [stopLoss, setStopLoss] = useState<string>('');
-  const [takeProfit, setTakeProfit] = useState<string>('');
   const [orderCount, setOrderCount] = useState<string>('1');
   const [manualPnl, setManualPnl] = useState<string>('');
   const [technicalNote, setTechnicalNote] = useState('');
+
+  // SL/TP Input Mode & Points State
+  const [sltpMode, setSltpMode] = useState<SLTPInputMode>('PRICE');
+  const [stopLoss, setStopLoss] = useState<string>('');
+  const [takeProfit, setTakeProfit] = useState<string>('');
+  const [slPoints, setSlPoints] = useState<string>('');
+  const [tpPoints, setTpPoints] = useState<string>('');
+  const [pointUnit, setPointUnit] = useState<number>(0.01); // 0.01 for Gold/Index, 0.0001 for Forex, 1.0 for Stocks
 
   useEffect(() => {
     if (tradeToEdit) {
@@ -57,6 +64,9 @@ export const TradeModal: React.FC<TradeModalProps> = ({
       setOrderCount(String(tradeToEdit.orderCount || 1));
       setManualPnl(tradeToEdit.pnl !== undefined ? String(tradeToEdit.pnl) : '');
       setTechnicalNote(tradeToEdit.technicalNote || '');
+      setSltpMode('PRICE');
+      setSlPoints('');
+      setTpPoints('');
     } else {
       setDatetime(getDefaultDateTime());
       setSymbol('');
@@ -66,13 +76,75 @@ export const TradeModal: React.FC<TradeModalProps> = ({
       setExitPrice('');
       setStopLoss('');
       setTakeProfit('');
+      setSlPoints('');
+      setTpPoints('');
       setOrderCount('1');
       setManualPnl('');
       setTechnicalNote('');
+      setSltpMode('PRICE');
     }
   }, [tradeToEdit, isOpen]);
 
+  // Adjust point unit automatically based on symbol
+  useEffect(() => {
+    const sym = symbol.toUpperCase();
+    if (sym === 'XAUUSD' || sym === 'GOLD' || sym === 'XAU') {
+      setPointUnit(0.01);
+    } else if (sym.length === 6 && !sym.includes('USD') && !sym.includes('BTC')) {
+      setPointUnit(0.0001);
+    }
+  }, [symbol]);
+
   if (!isOpen) return null;
+
+  // Real-time Calculations
+  const entryNum = parseFloat(entryPrice) || 0;
+  const lotNum = parseFloat(lotSize) || 0;
+  const ordersNum = parseInt(orderCount) || 1;
+
+  // Compute SL & TP Prices dynamically based on mode
+  let finalSLPrice: number | null = null;
+  let finalTPPrice: number | null = null;
+  let slDistPointsPreview: number | null = null;
+  let tpDistPointsPreview: number | null = null;
+
+  if (sltpMode === 'PRICE') {
+    finalSLPrice = stopLoss !== '' ? parseFloat(stopLoss) : null;
+    finalTPPrice = takeProfit !== '' ? parseFloat(takeProfit) : null;
+
+    if (entryNum > 0 && finalSLPrice !== null && !isNaN(finalSLPrice)) {
+      slDistPointsPreview = Math.round(Math.abs(entryNum - finalSLPrice) / pointUnit);
+    }
+    if (entryNum > 0 && finalTPPrice !== null && !isNaN(finalTPPrice)) {
+      tpDistPointsPreview = Math.round(Math.abs(finalTPPrice - entryNum) / pointUnit);
+    }
+  } else {
+    // POINTS Mode
+    const slPts = parseFloat(slPoints);
+    const tpPts = parseFloat(tpPoints);
+
+    if (entryNum > 0 && !isNaN(slPts) && slPts > 0) {
+      slDistPointsPreview = slPts;
+      const priceDiff = slPts * pointUnit;
+      finalSLPrice = direction === 'BUY' ? entryNum - priceDiff : entryNum + priceDiff;
+    }
+
+    if (entryNum > 0 && !isNaN(tpPts) && tpPts > 0) {
+      tpDistPointsPreview = tpPts;
+      const priceDiff = tpPts * pointUnit;
+      finalTPPrice = direction === 'BUY' ? entryNum + priceDiff : entryNum - priceDiff;
+    }
+  }
+
+  // Calculate live Risk:Reward Ratio
+  let liveRR = '-';
+  if (entryNum > 0 && finalSLPrice !== null && finalTPPrice !== null && finalSLPrice !== entryNum) {
+    const risk = Math.abs(entryNum - finalSLPrice);
+    const reward = Math.abs(finalTPPrice - entryNum);
+    if (risk > 0) {
+      liveRR = (reward / risk).toFixed(2);
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +152,10 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     const entry = parseFloat(entryPrice);
     const exit = parseFloat(exitPrice);
     const lot = parseFloat(lotSize);
-    const sl = stopLoss ? parseFloat(stopLoss) : null;
-    const tp = takeProfit ? parseFloat(takeProfit) : null;
     const orders = parseInt(orderCount) || 1;
     const userPnl = manualPnl !== '' ? parseFloat(manualPnl) : null;
 
-    const metrics = calculateTradeMetrics(entry, exit, lot, direction, sl, tp, userPnl);
+    const metrics = calculateTradeMetrics(entry, exit, lot, direction, finalSLPrice, finalTPPrice, userPnl);
 
     const trade: Trade = {
       id: tradeToEdit ? tradeToEdit.id : `trade-${Date.now()}`,
@@ -95,8 +165,8 @@ export const TradeModal: React.FC<TradeModalProps> = ({
       lotSize: lot,
       entryPrice: entry,
       exitPrice: exit,
-      stopLoss: sl,
-      takeProfit: tp,
+      stopLoss: finalSLPrice,
+      takeProfit: finalTPPrice,
       orderCount: orders,
       technicalNote: technicalNote.trim(),
       pnl: metrics.pnl,
@@ -146,7 +216,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               <input
                 type="text"
                 id="field-symbol"
-                placeholder="เช่น PTT, NVDA, EURUSD, BTC"
+                placeholder="เช่น XAUUSD, EURUSD, PTT, BTC"
                 value={symbol}
                 onChange={(e) => setSymbol(e.target.value)}
                 required
@@ -189,7 +259,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                 type="number"
                 id="field-lot"
                 step="any"
-                placeholder="เช่น 1.0, 1000, 0.5"
+                placeholder="เช่น 1.0, 0.5"
                 value={lotSize}
                 onChange={(e) => setLotSize(e.target.value)}
                 required
@@ -210,31 +280,6 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               />
             </div>
 
-            {/* Real-time Leverage & Margin Live Calculator Box */}
-            {parseFloat(lotSize) > 0 && (
-              <div className="form-group full-width margin-calc-box">
-                <div className="flex justify-between items-center flex-wrap gap-2 text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <Gauge className="w-3.5 h-3.5 text-purple-400" /> 
-                    Leverage <strong>1:{leverage}</strong> | หลักประกันที่ใช้ (Margin): 
-                    <strong className="text-indigo-300">
-                      {formatCurrency(calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage), currency)}
-                    </strong> 
-                    ({currentBalance > 0 ? ((calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage) / currentBalance) * 100).toFixed(1) : 0}% ของพอร์ต)
-                  </span>
-                  <span className="text-muted">
-                    Lot สูงสุดที่พอร์ตนี้ออกได้: <strong className="text-emerald-400">~{calculateMaxLot(currentBalance, leverage, parseFloat(entryPrice)).toFixed(2)} Lot</strong>
-                  </span>
-                </div>
-                {calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage) > currentBalance && currentBalance > 0 && (
-                  <p className="text-xs text-danger mt-1 font-semibold flex items-center gap-1">
-                    ⚠️ คำเตือน: หลักประกันที่ต้องใช้ ({formatCurrency(calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage), currency)}) เกินยอดเงินที่มีในพอร์ต ({formatCurrency(currentBalance, currency)})!
-                  </p>
-                )}
-              </div>
-            )}
-
-
             {/* Exit Price */}
             <div className="form-group">
               <label htmlFor="field-exit">ราคาออก (Exit Price) <span className="required">*</span></label>
@@ -249,35 +294,171 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               />
             </div>
 
-            {/* Stop Loss */}
-            <div className="form-group">
-              <label htmlFor="field-sl">
-                <ShieldAlert className="w-3.5 h-3.5 inline mr-1 text-danger" /> Stop Loss (SL)
-              </label>
-              <input
-                type="number"
-                id="field-sl"
-                step="any"
-                placeholder="ราคาตั้งคัทลอส"
-                value={stopLoss}
-                onChange={(e) => setStopLoss(e.target.value)}
-              />
+            {/* Real-time Leverage & Margin Live Calculator Box */}
+            {lotNum > 0 && (
+              <div className="form-group full-width margin-calc-box">
+                <div className="flex justify-between items-center flex-wrap gap-2 text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <Gauge className="w-3.5 h-3.5 text-purple-400" /> 
+                    Leverage <strong>1:{leverage}</strong> | หลักประกันที่ใช้ (Margin): 
+                    <strong className="text-indigo-300">
+                      {formatCurrency(calculateRequiredMargin(lotNum * ordersNum, entryNum, leverage), currency)}
+                    </strong> 
+                    ({currentBalance > 0 ? ((calculateRequiredMargin(lotNum * ordersNum, entryNum, leverage) / currentBalance) * 100).toFixed(1) : 0}% ของพอร์ต)
+                  </span>
+                  <span className="text-muted">
+                    Lot สูงสุดที่พอร์ตนี้ออกได้: <strong className="text-emerald-400">~{calculateMaxLot(currentBalance, leverage, entryNum).toFixed(2)} Lot</strong>
+                  </span>
+                </div>
+                {calculateRequiredMargin(lotNum * ordersNum, entryNum, leverage) > currentBalance && currentBalance > 0 && (
+                  <p className="text-xs text-danger mt-1 font-semibold flex items-center gap-1">
+                    ⚠️ คำเตือน: หลักประกันที่ต้องใช้ ({formatCurrency(calculateRequiredMargin(lotNum * ordersNum, entryNum, leverage), currency)}) เกินยอดเงินที่มีในพอร์ต ({formatCurrency(currentBalance, currency)})!
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* SL / TP Mode Selector Bar */}
+            <div className="form-group full-width">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-semibold text-muted flex items-center gap-1">
+                  <Calculator className="w-3.5 h-3.5 text-indigo-400" />
+                  เลือกโหมดการกรอก Stop Loss (SL) & Take Profit (TP)
+                </label>
+                {/* Unit multiplier selector */}
+                <div className="flex items-center gap-1 text-xs text-muted">
+                  <span>หน่วย:</span>
+                  <select
+                    value={pointUnit}
+                    onChange={(e) => setPointUnit(parseFloat(e.target.value))}
+                    className="select-sm py-0.5 px-1.5 text-xs"
+                  >
+                    <option value={0.01}>0.01 (ทอง XAUUSD / ดัชนี)</option>
+                    <option value={0.0001}>0.0001 (Forex Pips)</option>
+                    <option value={1.0}>1.0 (หุ้น / Crypto)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="segmented-control mb-3">
+                <input
+                  type="radio"
+                  name="sltpMode"
+                  id="mode-price"
+                  value="PRICE"
+                  checked={sltpMode === 'PRICE'}
+                  onChange={() => setSltpMode('PRICE')}
+                />
+                <label htmlFor="mode-price" className={sltpMode === 'PRICE' ? 'label-buy' : ''}>
+                  🎯 ระบุเป็น ราคา (Price)
+                </label>
+
+                <input
+                  type="radio"
+                  name="sltpMode"
+                  id="mode-points"
+                  value="POINTS"
+                  checked={sltpMode === 'POINTS'}
+                  onChange={() => setSltpMode('POINTS')}
+                />
+                <label htmlFor="mode-points" className={sltpMode === 'POINTS' ? 'label-buy' : ''}>
+                  📏 ระบุเป็น ระยะจุด (Points / Pips)
+                </label>
+              </div>
             </div>
 
-            {/* Take Profit */}
-            <div className="form-group">
-              <label htmlFor="field-tp">
-                <Target className="w-3.5 h-3.5 inline mr-1 text-success" /> Take Profit (TP)
-              </label>
-              <input
-                type="number"
-                id="field-tp"
-                step="any"
-                placeholder="ราคาเป้าหมายกำไร"
-                value={takeProfit}
-                onChange={(e) => setTakeProfit(e.target.value)}
-              />
-            </div>
+            {/* Mode A: Price Input */}
+            {sltpMode === 'PRICE' ? (
+              <>
+                {/* Stop Loss Price */}
+                <div className="form-group">
+                  <label htmlFor="field-sl" className="flex justify-between">
+                    <span><ShieldAlert className="w-3.5 h-3.5 inline mr-1 text-danger" /> Stop Loss (SL Price)</span>
+                    {slDistPointsPreview !== null && (
+                      <span className="text-danger font-normal text-xs">({slDistPointsPreview.toLocaleString()} pts)</span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    id="field-sl"
+                    step="any"
+                    placeholder="ราคาตั้งคัทลอส"
+                    value={stopLoss}
+                    onChange={(e) => setStopLoss(e.target.value)}
+                  />
+                </div>
+
+                {/* Take Profit Price */}
+                <div className="form-group">
+                  <label htmlFor="field-tp" className="flex justify-between">
+                    <span><Target className="w-3.5 h-3.5 inline mr-1 text-success" /> Take Profit (TP Price)</span>
+                    {tpDistPointsPreview !== null && (
+                      <span className="text-success font-normal text-xs">({tpDistPointsPreview.toLocaleString()} pts)</span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    id="field-tp"
+                    step="any"
+                    placeholder="ราคาเป้าหมายกำไร"
+                    value={takeProfit}
+                    onChange={(e) => setTakeProfit(e.target.value)}
+                  />
+                </div>
+              </>
+            ) : (
+              /* Mode B: Points / Pips Input */
+              <>
+                {/* Stop Loss Points */}
+                <div className="form-group">
+                  <label htmlFor="field-sl-pts" className="flex justify-between">
+                    <span><ShieldAlert className="w-3.5 h-3.5 inline mr-1 text-danger" /> Stop Loss (ระยะจุด/Points)</span>
+                    {finalSLPrice !== null && (
+                      <span className="text-indigo-300 font-normal text-xs">ราคา SL: <strong>{finalSLPrice.toFixed(2)}</strong></span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    id="field-sl-pts"
+                    step="any"
+                    placeholder="เช่น 1000 (จุด)"
+                    value={slPoints}
+                    onChange={(e) => setSlPoints(e.target.value)}
+                  />
+                </div>
+
+                {/* Take Profit Points */}
+                <div className="form-group">
+                  <label htmlFor="field-tp-pts" className="flex justify-between">
+                    <span><Target className="w-3.5 h-3.5 inline mr-1 text-success" /> Take Profit (ระยะจุด/Points)</span>
+                    {finalTPPrice !== null && (
+                      <span className="text-indigo-300 font-normal text-xs">ราคา TP: <strong>{finalTPPrice.toFixed(2)}</strong></span>
+                    )}
+                  </label>
+                  <input
+                    type="number"
+                    id="field-tp-pts"
+                    step="any"
+                    placeholder="เช่น 2000 (จุด)"
+                    value={tpPoints}
+                    onChange={(e) => setTpPoints(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Live Risk:Reward Ratio & Conversion Box */}
+            {(finalSLPrice !== null || finalTPPrice !== null) && (
+              <div className="form-group full-width bg-dark/60 p-3 rounded-lg border border-color flex justify-between items-center text-xs flex-wrap gap-2">
+                <span>
+                  คำนวณราคา SL: <strong className="text-danger">{finalSLPrice !== null ? finalSLPrice.toFixed(2) : '-'}</strong> | 
+                  ราคา TP: <strong className="text-success">{finalTPPrice !== null ? finalTPPrice.toFixed(2) : '-'}</strong>
+                </span>
+                <span>
+                  อัตราความเสี่ยงต่อผลตอบแทน (R:R Ratio): <strong className="text-amber-400 text-sm font-bold">1 : {liveRR}</strong>
+                </span>
+              </div>
+            )}
 
             {/* Order Count */}
             <div className="form-group">
