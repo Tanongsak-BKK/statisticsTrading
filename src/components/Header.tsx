@@ -14,6 +14,7 @@ interface HeaderProps {
   xauusdInfo?: XAUUSDPriceResult | null;
   usdThbInfo?: CurrencyRateResult | null;
   onRefreshXAUUSD?: () => void;
+  onRefreshUSDTHB?: () => void;
   isFirebaseActive?: boolean;
 }
 
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   xauusdInfo,
   usdThbInfo,
   onRefreshXAUUSD,
+  onRefreshUSDTHB,
   isFirebaseActive
 }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,10 +101,21 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <span className="text-muted">USD/THB:</span>
           <strong className="text-emerald-300">
-            ฿{usdThbInfo?.usdThbRate ? usdThbInfo.usdThbRate.toFixed(2) : '36.50'}
+            {usdThbInfo?.usdThbRate ? `฿${usdThbInfo.usdThbRate.toFixed(2)}` : '฿36.50'}
           </strong>
+          {onRefreshUSDTHB && (
+            <button
+              type="button"
+              onClick={onRefreshUSDTHB}
+              className="hover:text-emerald-300 ml-1 transition-transform active:rotate-180"
+              title="ดึงอัตราแลกเปลี่ยน USD/THB ล่าสุด"
+            >
+              <RefreshCw className="w-3 h-3 text-muted" />
+            </button>
+          )}
         </div>
       </div>
+
 
       <div className="header-actions">
         {onOpenBalanceModal && (

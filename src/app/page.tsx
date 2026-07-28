@@ -30,6 +30,7 @@ export default function Home() {
     xauusdInfo,
     usdThbInfo,
     refreshXAUUSD,
+    refreshUSDTHB,
     isFirebaseActive
   } = useTradingJournal();
 
@@ -67,8 +68,10 @@ export default function Home() {
         xauusdInfo={xauusdInfo}
         usdThbInfo={usdThbInfo}
         onRefreshXAUUSD={() => refreshXAUUSD(true)}
+        onRefreshUSDTHB={() => refreshUSDTHB(true)}
         isFirebaseActive={isFirebaseActive}
       />
+
 
 
       {/* KPI Cards Overview */}
