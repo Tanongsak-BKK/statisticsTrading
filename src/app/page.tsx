@@ -26,7 +26,11 @@ export default function Home() {
     deleteTrade,
     clearAllTrades,
     exportJSON,
-    importJSON
+    importJSON,
+    xauusdInfo,
+    usdThbInfo,
+    refreshXAUUSD,
+    isFirebaseActive
   } = useTradingJournal();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -60,7 +64,12 @@ export default function Home() {
         onImport={importJSON}
         onClearAll={clearAllTrades}
         onOpenBalanceModal={() => setIsBalanceModalOpen(true)}
+        xauusdInfo={xauusdInfo}
+        usdThbInfo={usdThbInfo}
+        onRefreshXAUUSD={() => refreshXAUUSD(true)}
+        isFirebaseActive={isFirebaseActive}
       />
+
 
       {/* KPI Cards Overview */}
       <KPICards
