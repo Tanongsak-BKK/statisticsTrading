@@ -1,66 +1,92 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+
+import React, { useState } from 'react';
+import { useTradingJournal } from '@/hooks/useTradingJournal';
+import { Header } from '@/components/Header';
+import { KPICards } from '@/components/KPICards';
+import { AnalyticsSection } from '@/components/AnalyticsSection';
+import { TradeLogTable } from '@/components/TradeLogTable';
+import { TradeModal } from '@/components/TradeModal';
+import { Trade } from '@/types/trade';
 
 export default function Home() {
+  const {
+    trades,
+    currency,
+    setCurrency,
+    isLoaded,
+    addOrUpdateTrade,
+    deleteTrade,
+    clearAllTrades,
+    exportJSON,
+    importJSON
+  } = useTradingJournal();
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tradeToEdit, setTradeToEdit] = useState<Trade | null>(null);
+
+  const handleOpenNewModal = () => {
+    setTradeToEdit(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (trade: Trade) => {
+    setTradeToEdit(trade);
+    setIsModalOpen(true);
+  };
+
+  if (!isLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-muted">
+        กำลังโหลดระบบ...
+      </div>
+    );
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="app-container">
+      {/* Header */}
+      <Header
+        onOpenModal={handleOpenNewModal}
+        onExport={exportJSON}
+        onImport={importJSON}
+        onClearAll={clearAllTrades}
+      />
+
+      {/* KPI Cards Overview */}
+      <KPICards trades={trades} currency={currency} />
+
+      {/* Analytics Section: Weekly / Monthly / All-Time */}
+      <main className="main-layout">
+        <AnalyticsSection
+          trades={trades}
+          currency={currency}
+          onCurrencyChange={setCurrency}
         />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+
+        {/* Trade Log Table */}
+        <TradeLogTable
+          trades={trades}
+          currency={currency}
+          onEdit={handleOpenEditModal}
+          onDelete={deleteTrade}
+        />
       </main>
+
+      {/* Modal Form */}
+      <TradeModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={addOrUpdateTrade}
+        tradeToEdit={tradeToEdit}
+      />
+
+      {/* Footer */}
+      <footer className="app-footer">
+        <p>
+          Trading Journal & Analytics &copy; 2026 - บันทึกและวิเคราะห์สถิติการเทรดเพื่อพัฒนาวินัยและผลตอบแทนอย่างยั่งยืน (Next.js App)
+        </p>
+      </footer>
     </div>
   );
 }

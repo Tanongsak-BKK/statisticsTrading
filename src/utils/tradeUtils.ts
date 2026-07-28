@@ -1,0 +1,187 @@
+import { Trade, Direction, Outcome, WeeklySummary, MonthlySummary, AllTimeStats, CurrencyUnit } from '@/types/trade';
+
+export function getTradeDateDetails(dateStr: string) {
+  const d = new Date(dateStr);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const monthYearLabel = `${d.toLocaleString('th-TH', { month: 'short' })} ${year}`;
+
+  // Calculate ISO Week Number
+  const target = new Date(d.valueOf());
+  const dayNumber = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNumber + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) {
+    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
+  }
+  const weekNo = 1 + Math.round((firstThursday - target.valueOf()) / 604800000);
+  
+  const weekKey = `${year}-W${String(weekNo).padStart(2, '0')}`;
+  const monthKey = `${year}-${month}`;
+
+  return {
+    year,
+    monthKey,
+    weekKey,
+    monthYearLabel,
+    weekLabel: `W${weekNo} (${year})`
+  };
+}
+
+export function calculateTradeMetrics(
+  entry: number,
+  exit: number,
+  lot: number,
+  dir: Direction,
+  sl: number | null,
+  tp: number | null,
+  userPnl: number | null
+) {
+  let pnl = 0;
+  if (userPnl !== null && !isNaN(userPnl)) {
+    pnl = userPnl;
+  } else {
+    if (dir === 'BUY') {
+      pnl = (exit - entry) * lot;
+    } else {
+      pnl = (entry - exit) * lot;
+    }
+  }
+
+  let pnlPercent = 0;
+  if (entry > 0) {
+    if (dir === 'BUY') {
+      pnlPercent = ((exit - entry) / entry) * 100;
+    } else {
+      pnlPercent = ((entry - exit) / entry) * 100;
+    }
+  }
+
+  let outcome: Outcome = 'BREAKEVEN';
+  if (pnl > 0.0001) outcome = 'WIN';
+  else if (pnl < -0.0001) outcome = 'LOSS';
+
+  let rr = 0;
+  if (sl && tp && sl !== entry) {
+    const risk = Math.abs(entry - sl);
+    const reward = Math.abs(tp - entry);
+    if (risk > 0) {
+      rr = parseFloat((reward / risk).toFixed(2));
+    }
+  }
+
+  return {
+    pnl: parseFloat(pnl.toFixed(2)),
+    pnlPercent: parseFloat(pnlPercent.toFixed(2)),
+    outcome,
+    rr
+  };
+}
+
+export function formatCurrency(val: number, currency: CurrencyUnit = '$'): string {
+  const prefix = currency === 'pt' ? '' : currency;
+  const suffix = currency === 'pt' ? ' pts' : '';
+  const sign = val < 0 ? '-' : '';
+  const absVal = Math.abs(val).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${sign}${prefix}${absVal}${suffix}`;
+}
+
+export function getWeeklySummaries(trades: Trade[]): WeeklySummary[] {
+  const map: Record<string, WeeklySummary> = {};
+
+  trades.forEach(t => {
+    const details = getTradeDateDetails(t.datetime);
+    const key = details.weekKey;
+
+    if (!map[key]) {
+      map[key] = {
+        weekKey: key,
+        label: details.weekLabel,
+        tradesCount: 0,
+        wins: 0,
+        losses: 0,
+        totalPnL: 0
+      };
+    }
+
+    map[key].tradesCount++;
+    map[key].totalPnL += t.pnl;
+    if (t.outcome === 'WIN') map[key].wins++;
+    else if (t.outcome === 'LOSS') map[key].losses++;
+  });
+
+  return Object.keys(map).sort().map(k => map[k]);
+}
+
+export function getMonthlySummaries(trades: Trade[]): MonthlySummary[] {
+  const map: Record<string, MonthlySummary> = {};
+
+  trades.forEach(t => {
+    const details = getTradeDateDetails(t.datetime);
+    const key = details.monthKey;
+
+    if (!map[key]) {
+      map[key] = {
+        monthKey: key,
+        label: details.monthYearLabel,
+        tradesCount: 0,
+        wins: 0,
+        losses: 0,
+        totalPnL: 0
+      };
+    }
+
+    map[key].tradesCount++;
+    map[key].totalPnL += t.pnl;
+    if (t.outcome === 'WIN') map[key].wins++;
+    else if (t.outcome === 'LOSS') map[key].losses++;
+  });
+
+  return Object.keys(map).sort().map(k => map[k]);
+}
+
+export function getAllTimeStats(trades: Trade[]): AllTimeStats {
+  if (trades.length === 0) {
+    return {
+      bestTrade: 0,
+      worstTrade: 0,
+      avgWin: 0,
+      avgLoss: 0,
+      profitFactor: '0.00',
+      tradesPerDay: '0.0'
+    };
+  }
+
+  const pnls = trades.map(t => t.pnl);
+  const maxWin = Math.max(...pnls);
+  const maxLoss = Math.min(...pnls);
+
+  const winningTrades = trades.filter(t => t.pnl > 0);
+  const losingTrades = trades.filter(t => t.pnl < 0);
+
+  const totalWinAmount = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
+  const totalLossAmount = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
+
+  const avgWin = winningTrades.length > 0 ? totalWinAmount / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0 ? (totalLossAmount / losingTrades.length) * -1 : 0;
+
+  const profitFactor = totalLossAmount > 0 
+    ? (totalWinAmount / totalLossAmount).toFixed(2) 
+    : (totalWinAmount > 0 ? '∞' : '0.00');
+
+  const dates = trades.map(t => new Date(t.datetime).getTime());
+  const minDate = Math.min(...dates);
+  const maxDate = Math.max(...dates);
+  const diffDays = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 3600 * 24)));
+  const tradesPerDay = (trades.length / diffDays).toFixed(1);
+
+  return {
+    bestTrade: maxWin > 0 ? maxWin : 0,
+    worstTrade: maxLoss < 0 ? maxLoss : 0,
+    avgWin,
+    avgLoss,
+    profitFactor,
+    tradesPerDay
+  };
+}
