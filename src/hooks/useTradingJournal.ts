@@ -159,7 +159,11 @@ export function useTradingJournal() {
       }
       return updated;
     });
+
+    // Force fetch fresh XAUUSD market price immediately whenever a trade order is entered or updated
+    refreshXAUUSD(true);
   };
+
 
   const deleteTrade = (id: string) => {
     setTrades(prev => prev.filter(t => t.id !== id));

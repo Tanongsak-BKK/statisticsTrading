@@ -41,12 +41,15 @@ export default function Home() {
   const handleOpenNewModal = () => {
     setTradeToEdit(null);
     setIsModalOpen(true);
+    refreshXAUUSD(true);
   };
 
   const handleOpenEditModal = (trade: Trade) => {
     setTradeToEdit(trade);
     setIsModalOpen(true);
+    refreshXAUUSD(true);
   };
+
 
   if (!isLoaded) {
     return (
