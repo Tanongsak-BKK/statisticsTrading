@@ -101,8 +101,10 @@ export const xauusdService = {
           trade.direction,
           trade.stopLoss,
           trade.takeProfit,
-          null
+          null,
+          trade.symbol
         );
+
 
         const newNote = trade.technicalNote
           ? `${trade.technicalNote} ${triggerReason}`

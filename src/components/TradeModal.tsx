@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Trade, Direction, CurrencyUnit } from '@/types/trade';
-import { calculateTradeMetrics, calculateRequiredMargin, calculateMaxLot, formatCurrency } from '@/utils/tradeUtils';
-import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText, Gauge, Calculator } from 'lucide-react';
+import { calculateTradeMetrics, calculateRequiredMargin, calculateMaxLot, formatCurrency, getContractSize } from '@/utils/tradeUtils';
+import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText, Gauge, Calculator, AlertTriangle } from 'lucide-react';
 
 interface TradeModalProps {
   isOpen: boolean;
@@ -101,6 +101,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   const entryNum = parseFloat(entryPrice) || 0;
   const lotNum = parseFloat(lotSize) || 0;
   const ordersNum = parseInt(orderCount) || 1;
+  const contractSize = getContractSize(symbol);
 
   // Compute SL & TP Prices dynamically based on mode
   let finalSLPrice: number | null = null;
@@ -136,6 +137,28 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     }
   }
 
+  // Calculate SL Risk Impact ($ & % of Balance)
+  let slRiskAmount: number | null = null;
+  let slRiskPercent: number | null = null;
+  if (entryNum > 0 && finalSLPrice !== null && lotNum > 0) {
+    const priceDiff = Math.abs(entryNum - finalSLPrice);
+    slRiskAmount = priceDiff * lotNum * ordersNum * contractSize;
+    if (currentBalance > 0) {
+      slRiskPercent = (slRiskAmount / currentBalance) * 100;
+    }
+  }
+
+  // Calculate TP Reward Impact ($ & % of Balance)
+  let tpRewardAmount: number | null = null;
+  let tpRewardPercent: number | null = null;
+  if (entryNum > 0 && finalTPPrice !== null && lotNum > 0) {
+    const priceDiff = Math.abs(finalTPPrice - entryNum);
+    tpRewardAmount = priceDiff * lotNum * ordersNum * contractSize;
+    if (currentBalance > 0) {
+      tpRewardPercent = (tpRewardAmount / currentBalance) * 100;
+    }
+  }
+
   // Calculate live Risk:Reward Ratio
   let liveRR = '-';
   if (entryNum > 0 && finalSLPrice !== null && finalTPPrice !== null && finalSLPrice !== entryNum) {
@@ -154,13 +177,14 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     const lot = parseFloat(lotSize);
     const orders = parseInt(orderCount) || 1;
     const userPnl = manualPnl !== '' ? parseFloat(manualPnl) : null;
+    const activeSymbol = symbol.trim().toUpperCase();
 
-    const metrics = calculateTradeMetrics(entry, exit, lot, direction, finalSLPrice, finalTPPrice, userPnl);
+    const metrics = calculateTradeMetrics(entry, exit, lot, direction, finalSLPrice, finalTPPrice, userPnl, activeSymbol);
 
     const trade: Trade = {
       id: tradeToEdit ? tradeToEdit.id : `trade-${Date.now()}`,
       datetime,
-      symbol: symbol.trim().toUpperCase(),
+      symbol: activeSymbol,
       direction,
       lotSize: lot,
       entryPrice: entry,
@@ -312,7 +336,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                 </div>
                 {calculateRequiredMargin(lotNum * ordersNum, entryNum, leverage) > currentBalance && currentBalance > 0 && (
                   <p className="text-xs text-danger mt-1 font-semibold flex items-center gap-1">
-                    ⚠️ คำเตือน: หลักประกันที่ต้องใช้ ({formatCurrency(calculateRequiredMargin(lotNum * ordersNum, entryNum, leverage), currency)}) เกินยอดเงินที่มีในพอร์ต ({formatCurrency(currentBalance, currency)})!
+                    <AlertTriangle className="w-3.5 h-3.5 text-danger" /> คำเตือน: หลักประกันที่ต้องใช้ ({formatCurrency(calculateRequiredMargin(lotNum * ordersNum, entryNum, leverage), currency)}) เกินยอดเงินที่มีในพอร์ต ({formatCurrency(currentBalance, currency)})!
                   </p>
                 )}
               </div>
@@ -447,16 +471,68 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               </>
             )}
 
-            {/* Live Risk:Reward Ratio & Conversion Box */}
+            {/* Live SL / TP Risk & Reward Analysis Box against Portfolio Balance */}
             {(finalSLPrice !== null || finalTPPrice !== null) && (
-              <div className="form-group full-width bg-dark/60 p-3 rounded-lg border border-color flex justify-between items-center text-xs flex-wrap gap-2">
-                <span>
-                  คำนวณราคา SL: <strong className="text-danger">{finalSLPrice !== null ? finalSLPrice.toFixed(2) : '-'}</strong> | 
-                  ราคา TP: <strong className="text-success">{finalTPPrice !== null ? finalTPPrice.toFixed(2) : '-'}</strong>
-                </span>
-                <span>
-                  อัตราความเสี่ยงต่อผลตอบแทน (R:R Ratio): <strong className="text-amber-400 text-sm font-bold">1 : {liveRR}</strong>
-                </span>
+              <div className="form-group full-width sl-tp-analysis-box p-3 rounded-lg border border-color text-xs flex flex-col gap-2">
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <span className="font-semibold text-muted flex items-center gap-1">
+                    <Calculator className="w-3.5 h-3.5 text-indigo-400" />
+                    วิเคราะห์ผลกระทบ SL/TP ต่อ Balance พอร์ต ({formatCurrency(currentBalance, currency)}):
+                  </span>
+                  <span>
+                    อัตราส่วน Risk : Reward: <strong className="text-amber-400 text-sm font-bold">1 : {liveRR}</strong>
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-1">
+                  {/* SL Risk Impact */}
+                  <div className="p-2.5 rounded bg-rose-950/30 border border-rose-900/50">
+                    <div className="text-muted font-medium text-xs mb-1">
+                      🔴 หากแพ้ (Hit SL Price {finalSLPrice !== null ? finalSLPrice.toFixed(2) : '-'}):
+                    </div>
+                    {slRiskAmount !== null ? (
+                      <div>
+                        <span className="text-danger font-bold text-sm">
+                          -{formatCurrency(slRiskAmount, currency)}
+                        </span>
+                        {slRiskPercent !== null && (
+                          <span className="text-danger text-xs ml-1.5 font-semibold">
+                            (-{slRiskPercent.toFixed(2)}% พอร์ต)
+                          </span>
+                        )}
+                        <div className="text-muted text-[11px] mt-1">
+                          พอร์ตคงเหลือ: <strong>{formatCurrency(Math.max(0, currentBalance - slRiskAmount), currency)}</strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted italic">ระบุราคา/ระยะจุด SL เพื่อดูความเสี่ยง</span>
+                    )}
+                  </div>
+
+                  {/* TP Reward Impact */}
+                  <div className="p-2.5 rounded bg-emerald-950/30 border border-emerald-900/50">
+                    <div className="text-muted font-medium text-xs mb-1">
+                      🟢 หากชนะ (Hit TP Price {finalTPPrice !== null ? finalTPPrice.toFixed(2) : '-'}):
+                    </div>
+                    {tpRewardAmount !== null ? (
+                      <div>
+                        <span className="text-success font-bold text-sm">
+                          +{formatCurrency(tpRewardAmount, currency)}
+                        </span>
+                        {tpRewardPercent !== null && (
+                          <span className="text-success text-xs ml-1.5 font-semibold">
+                            (+{tpRewardPercent.toFixed(2)}% พอร์ต)
+                          </span>
+                        )}
+                        <div className="text-muted text-[11px] mt-1">
+                          พอร์ตคงเหลือ: <strong>{formatCurrency(currentBalance + tpRewardAmount, currency)}</strong>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-muted italic">ระบุราคา/ระยะจุด TP เพื่อดูผลตอบแทน</span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

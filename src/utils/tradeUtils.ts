@@ -29,6 +29,21 @@ export function getTradeDateDetails(dateStr: string) {
   };
 }
 
+export function getContractSize(symbol: string): number {
+  if (!symbol) return 100;
+  const s = symbol.trim().toUpperCase();
+  if (s === 'XAUUSD' || s === 'GOLD' || s === 'XAU') {
+    return 100; // 1.0 Lot Gold = 100 oz
+  }
+  if (s === 'XAGUSD' || s === 'SILVER') {
+    return 5000; // 1.0 Lot Silver = 5,000 oz
+  }
+  if ((s.length === 6 || s.includes('/')) && !s.includes('BTC') && !s.includes('ETH')) {
+    return 100000; // Forex pairs (EURUSD, GBPUSD, etc.): 1.0 Lot = 100,000 units
+  }
+  return 100; // Default contract size
+}
+
 export function calculateTradeMetrics(
   entry: number,
   exit: number,
@@ -36,16 +51,19 @@ export function calculateTradeMetrics(
   dir: Direction,
   sl: number | null,
   tp: number | null,
-  userPnl: number | null
+  userPnl: number | null,
+  symbol: string = 'XAUUSD'
 ) {
+  const contractSize = getContractSize(symbol);
   let pnl = 0;
+
   if (userPnl !== null && !isNaN(userPnl)) {
     pnl = userPnl;
   } else {
     if (dir === 'BUY') {
-      pnl = (exit - entry) * lot;
+      pnl = (exit - entry) * lot * contractSize;
     } else {
-      pnl = (entry - exit) * lot;
+      pnl = (entry - exit) * lot * contractSize;
     }
   }
 
@@ -75,9 +93,11 @@ export function calculateTradeMetrics(
     pnl: parseFloat(pnl.toFixed(2)),
     pnlPercent: parseFloat(pnlPercent.toFixed(2)),
     outcome,
-    rr
+    rr,
+    contractSize
   };
 }
+
 
 export function formatCurrency(val: number, currency: CurrencyUnit = '$'): string {
   const prefix = currency === 'pt' ? '' : currency;
