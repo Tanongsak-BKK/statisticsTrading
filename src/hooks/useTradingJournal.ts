@@ -4,23 +4,33 @@ import { useState, useEffect } from 'react';
 import { Trade, CurrencyUnit } from '@/types/trade';
 
 const STORAGE_KEY = 'statistics_trading_journal_v1';
+const BALANCE_STORAGE_KEY = 'statistics_trading_initial_balance_v1';
 
 export function useTradingJournal() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [currency, setCurrency] = useState<CurrencyUnit>('$');
+  const [initialBalance, setInitialBalanceState] = useState<number>(10000);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setTrades(JSON.parse(stored));
+      const storedTrades = localStorage.getItem(STORAGE_KEY);
+      if (storedTrades) {
+        setTrades(JSON.parse(storedTrades));
       } else {
         setTrades([]);
       }
+
+      const storedBalance = localStorage.getItem(BALANCE_STORAGE_KEY);
+      if (storedBalance !== null) {
+        const parsedBalance = parseFloat(storedBalance);
+        if (!isNaN(parsedBalance)) {
+          setInitialBalanceState(parsedBalance);
+        }
+      }
     } catch (err) {
-      console.error('Error loading trades from localStorage', err);
+      console.error('Error loading data from localStorage', err);
       setTrades([]);
     } finally {
       setIsLoaded(true);
@@ -33,6 +43,13 @@ export function useTradingJournal() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
     }
   }, [trades, isLoaded]);
+
+  // Update initial balance and persist
+  const setInitialBalance = (newBalance: number) => {
+    const val = isNaN(newBalance) || newBalance < 0 ? 0 : newBalance;
+    setInitialBalanceState(val);
+    localStorage.setItem(BALANCE_STORAGE_KEY, val.toString());
+  };
 
   const addOrUpdateTrade = (trade: Trade) => {
     setTrades(prev => {
@@ -55,8 +72,19 @@ export function useTradingJournal() {
     setTrades([]);
   };
 
+  // Calculate Net PnL and Current Balance
+  const totalPnL = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  const currentBalance = initialBalance + totalPnL;
+  const growthPercent = initialBalance > 0 ? (totalPnL / initialBalance) * 100 : 0;
+
   const exportJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(trades, null, 2));
+    const exportData = {
+      version: 1,
+      initialBalance,
+      currency,
+      trades
+    };
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
     const anchor = document.createElement('a');
     anchor.setAttribute('href', dataStr);
     anchor.setAttribute('download', `trading_journal_backup_${new Date().toISOString().slice(0, 10)}.json`);
@@ -71,8 +99,21 @@ export function useTradingJournal() {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
+
         if (Array.isArray(parsed)) {
+          // Legacy format (array of trades)
           setTrades(parsed);
+          alert('นำเข้าข้อมูลรายการเทรดสำเร็จ!');
+        } else if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.trades)) {
+            setTrades(parsed.trades);
+          }
+          if (typeof parsed.initialBalance === 'number') {
+            setInitialBalance(parsed.initialBalance);
+          }
+          if (parsed.currency) {
+            setCurrency(parsed.currency);
+          }
           alert('นำเข้าข้อมูลสำเร็จ!');
         } else {
           alert('ไฟล์ JSON รูปแบบไม่ถูกต้อง');
@@ -88,6 +129,11 @@ export function useTradingJournal() {
     trades,
     currency,
     setCurrency,
+    initialBalance,
+    setInitialBalance,
+    currentBalance,
+    growthPercent,
+    totalPnL,
     isLoaded,
     addOrUpdateTrade,
     deleteTrade,
@@ -96,3 +142,4 @@ export function useTradingJournal() {
     importJSON
   };
 }
+

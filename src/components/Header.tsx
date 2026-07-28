@@ -1,20 +1,22 @@
 'use client';
 
 import React from 'react';
-import { TrendingUp, Plus, Download, Upload, Trash2 } from 'lucide-react';
+import { TrendingUp, Plus, Download, Upload, Trash2, Wallet } from 'lucide-react';
 
 interface HeaderProps {
   onOpenModal: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
   onClearAll: () => void;
+  onOpenBalanceModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onOpenModal,
   onExport,
   onImport,
-  onClearAll
+  onClearAll,
+  onOpenBalanceModal
 }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -34,6 +36,11 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
       <div className="header-actions">
+        {onOpenBalanceModal && (
+          <button onClick={onOpenBalanceModal} className="btn btn-outline" title="ตั้งค่าเงินทุนเริ่มต้น">
+            <Wallet className="w-4 h-4 text-indigo-400" /> ตั้งค่าทุน
+          </button>
+        )}
         <button onClick={onOpenModal} className="btn btn-primary">
           <Plus className="w-4 h-4" /> บันทึกการเทรดใหม่
         </button>
@@ -59,3 +66,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

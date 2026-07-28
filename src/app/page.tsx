@@ -7,6 +7,7 @@ import { KPICards } from '@/components/KPICards';
 import { AnalyticsSection } from '@/components/AnalyticsSection';
 import { TradeLogTable } from '@/components/TradeLogTable';
 import { TradeModal } from '@/components/TradeModal';
+import { InitialBalanceModal } from '@/components/InitialBalanceModal';
 import { Trade } from '@/types/trade';
 
 export default function Home() {
@@ -14,6 +15,10 @@ export default function Home() {
     trades,
     currency,
     setCurrency,
+    initialBalance,
+    setInitialBalance,
+    currentBalance,
+    growthPercent,
     isLoaded,
     addOrUpdateTrade,
     deleteTrade,
@@ -23,6 +28,7 @@ export default function Home() {
   } = useTradingJournal();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [tradeToEdit, setTradeToEdit] = useState<Trade | null>(null);
 
   const handleOpenNewModal = () => {
@@ -51,10 +57,18 @@ export default function Home() {
         onExport={exportJSON}
         onImport={importJSON}
         onClearAll={clearAllTrades}
+        onOpenBalanceModal={() => setIsBalanceModalOpen(true)}
       />
 
       {/* KPI Cards Overview */}
-      <KPICards trades={trades} currency={currency} />
+      <KPICards
+        trades={trades}
+        currency={currency}
+        initialBalance={initialBalance}
+        currentBalance={currentBalance}
+        growthPercent={growthPercent}
+        onOpenBalanceModal={() => setIsBalanceModalOpen(true)}
+      />
 
       {/* Analytics Section: Weekly / Monthly / All-Time */}
       <main className="main-layout">
@@ -62,6 +76,9 @@ export default function Home() {
           trades={trades}
           currency={currency}
           onCurrencyChange={setCurrency}
+          initialBalance={initialBalance}
+          currentBalance={currentBalance}
+          growthPercent={growthPercent}
         />
 
         {/* Trade Log Table */}
@@ -73,12 +90,21 @@ export default function Home() {
         />
       </main>
 
-      {/* Modal Form */}
+      {/* Trade Modal Form */}
       <TradeModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={addOrUpdateTrade}
         tradeToEdit={tradeToEdit}
+      />
+
+      {/* Initial Balance Modal */}
+      <InitialBalanceModal
+        isOpen={isBalanceModalOpen}
+        onClose={() => setIsBalanceModalOpen(false)}
+        initialBalance={initialBalance}
+        onSave={setInitialBalance}
+        currency={currency}
       />
 
       {/* Footer */}
@@ -90,3 +116,4 @@ export default function Home() {
     </div>
   );
 }
+

@@ -16,18 +16,26 @@ interface AnalyticsSectionProps {
   trades: Trade[];
   currency: CurrencyUnit;
   onCurrencyChange: (c: CurrencyUnit) => void;
+  initialBalance: number;
+  currentBalance: number;
+  growthPercent: number;
 }
 
 export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   trades,
   currency,
-  onCurrencyChange
+  onCurrencyChange,
+  initialBalance,
+  currentBalance,
+  growthPercent
 }) => {
   const [activeTab, setActiveTab] = useState<'week' | 'month' | 'all'>('week');
 
   const weeklySummaries = getWeeklySummaries(trades);
   const monthlySummaries = getMonthlySummaries(trades);
   const allTimeStats = getAllTimeStats(trades);
+
+  const growthFormatted = `${growthPercent >= 0 ? '+' : ''}${growthPercent.toFixed(2)}%`;
 
   return (
     <section className="card analytics-section">
@@ -49,7 +57,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
             className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`}
             onClick={() => setActiveTab('all')}
           >
-            <ListChecks className="w-4 h-4" /> ภาพรวมทั้งหมด (All Time)
+            <ListChecks className="w-4 h-4" /> ภาพรวมทั้งหมด (All Time & Balance)
           </button>
         </div>
 
@@ -215,10 +223,28 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
         </div>
       )}
 
-      {/* Tab 3: All Time Stats Overview */}
+      {/* Tab 3: All Time Stats & Portfolio Balance Overview */}
       {activeTab === 'all' && (
         <div className="tab-content active">
           <div className="stats-overview-grid">
+            <div className="stat-box highlight-stat">
+              <span className="stat-label">Initial Balance (เงินทุนเริ่มต้น)</span>
+              <span className="stat-value text-muted">
+                {formatCurrency(initialBalance, currency)}
+              </span>
+            </div>
+            <div className="stat-box highlight-stat">
+              <span className="stat-label">Current Balance (ยอดเงินพอร์ตปัจจุบัน)</span>
+              <span className="stat-value text-primary-gradient font-bold">
+                {formatCurrency(currentBalance, currency)}
+              </span>
+            </div>
+            <div className="stat-box highlight-stat">
+              <span className="stat-label">Portfolio Return (% การเติบโต)</span>
+              <span className={`stat-value ${growthPercent >= 0 ? 'text-success' : 'text-danger'}`}>
+                {growthFormatted}
+              </span>
+            </div>
             <div className="stat-box">
               <span className="stat-label">Best Trade (กำไรสูงสุด)</span>
               <span className="stat-value text-success">
@@ -257,3 +283,4 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
     </section>
   );
 };
+
