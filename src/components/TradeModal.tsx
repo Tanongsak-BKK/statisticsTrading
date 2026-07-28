@@ -388,20 +388,24 @@ export const TradeModal: React.FC<TradeModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label htmlFor="field-session">
-                <Globe className="w-3.5 h-3.5 inline mr-1 text-amber-400" /> ช่วงเวลาเทรด (Trading Session)
+              <label htmlFor="field-session" className="flex justify-between items-center">
+                <span><Globe className="w-3.5 h-3.5 inline mr-1 text-amber-400" /> ช่วงเวลาเทรด (Trading Session)</span>
+                <span className="text-[10px] text-amber-400 font-semibold bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-800/40">
+                  ⚡ Auto Detect
+                </span>
               </label>
               <select
                 id="field-session"
                 value={session}
                 onChange={(e) => setSession(e.target.value)}
               >
-                <option value="ASIAN">🌏 Asian Session (07:00 - 15:00 น.)</option>
-                <option value="LONDON">🏰 London Session (14:00 - 23:00 น.)</option>
-                <option value="NEW_YORK">🗽 New York Session (20:00 - 04:00 น.)</option>
-                <option value="OVERLAP">🔥 Overlap Session (20:00 - 23:00 น.)</option>
+                <option value="ASIAN">🌏 Asian Session (05:00 - 14:00 น.)</option>
+                <option value="LONDON">🏰 London Session (14:00 - 19:00 น.)</option>
+                <option value="OVERLAP">🔥 Overlap Session (London + NY 19:00 - 23:00 น.)</option>
+                <option value="NEW_YORK">🗽 New York Session (23:00 - 05:00 น.)</option>
               </select>
             </div>
+
 
             {/* Real-time Leverage & Margin Live Calculator Box */}
             {lotNum > 0 && (

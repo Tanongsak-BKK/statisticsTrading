@@ -44,16 +44,17 @@ export function getContractSize(symbol: string): number {
   return 100; // Default contract size
 }
 
-export function detectTradingSession(datetimeStr: string): 'ASIAN' | 'LONDON' | 'NEW_YORK' | 'OVERLAP' {
-  if (!datetimeStr) return 'ASIAN';
-  const d = new Date(datetimeStr);
-  const hours = d.getUTCHours();
+export function detectTradingSession(datetimeStr?: string): 'ASIAN' | 'LONDON' | 'NEW_YORK' | 'OVERLAP' {
+  const d = datetimeStr ? new Date(datetimeStr) : new Date();
+  if (isNaN(d.getTime())) return 'ASIAN';
+  const hours = d.getHours();
 
-  if (hours >= 13 && hours < 16) return 'OVERLAP';
-  if (hours >= 13 && hours < 21) return 'NEW_YORK';
-  if (hours >= 7 && hours < 16) return 'LONDON';
+  if (hours >= 19 && hours < 23) return 'OVERLAP';
+  if (hours >= 23 || hours < 5) return 'NEW_YORK';
+  if (hours >= 14 && hours < 19) return 'LONDON';
   return 'ASIAN';
 }
+
 
 export function calculateTradeMetrics(
   entry: number,
