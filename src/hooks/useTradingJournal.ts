@@ -216,11 +216,42 @@ export function useTradingJournal() {
   };
 
   const deleteTrade = (id: string) => {
+    setTrades(prev =>
+      prev.map(t => {
+        if (t.id === id) {
+          const deletedTrade = { ...t, isDeleted: true, deletedAt: new Date().toISOString() };
+          if (firebaseService.isConfigured()) {
+            firebaseService.saveTrade(deletedTrade);
+          }
+          return deletedTrade;
+        }
+        return t;
+      })
+    );
+  };
+
+  const restoreTrade = (id: string) => {
+    setTrades(prev =>
+      prev.map(t => {
+        if (t.id === id) {
+          const restoredTrade = { ...t, isDeleted: false, deletedAt: undefined };
+          if (firebaseService.isConfigured()) {
+            firebaseService.saveTrade(restoredTrade);
+          }
+          return restoredTrade;
+        }
+        return t;
+      })
+    );
+  };
+
+  const permanentDeleteTrade = (id: string) => {
     setTrades(prev => prev.filter(t => t.id !== id));
     if (firebaseService.isConfigured()) {
       firebaseService.deleteTrade(id);
     }
   };
+
 
   const clearAllTrades = () => {
     setTrades([]);
@@ -325,7 +356,10 @@ export function useTradingJournal() {
     isLoaded,
     addOrUpdateTrade,
     deleteTrade,
+    restoreTrade,
+    permanentDeleteTrade,
     clearAllTrades,
+
     exportJSON,
     importJSON,
     xauusdInfo,

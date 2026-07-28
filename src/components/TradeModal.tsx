@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Trade, Direction, CurrencyUnit } from '@/types/trade';
-import { calculateTradeMetrics, calculateRequiredMargin, calculateMaxLot, formatCurrency, getContractSize } from '@/utils/tradeUtils';
-import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText, Gauge, Calculator, AlertTriangle } from 'lucide-react';
+import { calculateTradeMetrics, calculateRequiredMargin, calculateMaxLot, formatCurrency, getContractSize, detectTradingSession } from '@/utils/tradeUtils';
+import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText, Gauge, Calculator, AlertTriangle, Image as ImageIcon, Tag, Globe, Percent } from 'lucide-react';
 
 interface TradeModalProps {
   isOpen: boolean;
@@ -51,6 +51,13 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   const [tpPoints, setTpPoints] = useState<string>('');
   const [pointUnit, setPointUnit] = useState<number>(0.01); // 0.01 for Gold/Index, 0.0001 for Forex, 1.0 for Stocks
 
+  // New Fields: Commission, Swap, Strategy, Session, Chart URL
+  const [commission, setCommission] = useState<string>('');
+  const [swap, setSwap] = useState<string>('');
+  const [strategy, setStrategy] = useState<string>('Breakout');
+  const [session, setSession] = useState<string>('NEW_YORK');
+  const [chartUrl, setChartUrl] = useState<string>('');
+
   useEffect(() => {
     if (tradeToEdit) {
       setDatetime(tradeToEdit.datetime);
@@ -58,18 +65,25 @@ export const TradeModal: React.FC<TradeModalProps> = ({
       setDirection(tradeToEdit.direction);
       setLotSize(String(tradeToEdit.lotSize));
       setEntryPrice(String(tradeToEdit.entryPrice));
-      setExitPrice(String(tradeToEdit.exitPrice));
+      setExitPrice(tradeToEdit.exitPrice !== null ? String(tradeToEdit.exitPrice) : '');
       setStopLoss(tradeToEdit.stopLoss !== null ? String(tradeToEdit.stopLoss) : '');
       setTakeProfit(tradeToEdit.takeProfit !== null ? String(tradeToEdit.takeProfit) : '');
       setOrderCount(String(tradeToEdit.orderCount || 1));
       setManualPnl('');
       setTechnicalNote(tradeToEdit.technicalNote || '');
 
+      setCommission(tradeToEdit.commission !== undefined && tradeToEdit.commission !== null ? String(tradeToEdit.commission) : '');
+      setSwap(tradeToEdit.swap !== undefined && tradeToEdit.swap !== null ? String(tradeToEdit.swap) : '');
+      setStrategy(tradeToEdit.strategy || 'Breakout');
+      setSession(tradeToEdit.session || detectTradingSession(tradeToEdit.datetime));
+      setChartUrl(tradeToEdit.chartUrl || '');
+
       setSltpMode('PRICE');
       setSlPoints('');
       setTpPoints('');
     } else {
-      setDatetime(getDefaultDateTime());
+      const defaultTime = getDefaultDateTime();
+      setDatetime(defaultTime);
       setSymbol('');
       setDirection('BUY');
       setLotSize('');
@@ -82,11 +96,18 @@ export const TradeModal: React.FC<TradeModalProps> = ({
       setOrderCount('1');
       setManualPnl('');
       setTechnicalNote('');
+
+      setCommission('');
+      setSwap('');
+      setStrategy('Breakout');
+      setSession(detectTradingSession(defaultTime));
+      setChartUrl('');
+
       setSltpMode('PRICE');
     }
   }, [tradeToEdit, isOpen]);
 
-  // Adjust point unit automatically based on symbol
+  // Adjust point unit automatically based on symbol and auto detect session on datetime change
   useEffect(() => {
     const sym = symbol.toUpperCase();
     if (sym === 'XAUUSD' || sym === 'GOLD' || sym === 'XAU') {
@@ -96,12 +117,20 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     }
   }, [symbol]);
 
+  useEffect(() => {
+    if (datetime && !tradeToEdit) {
+      setSession(detectTradingSession(datetime));
+    }
+  }, [datetime, tradeToEdit]);
+
   if (!isOpen) return null;
 
   // Real-time Calculations
   const entryNum = parseFloat(entryPrice) || 0;
   const lotNum = parseFloat(lotSize) || 0;
   const ordersNum = parseInt(orderCount) || 1;
+  const commNum = parseFloat(commission) || 0;
+  const swapNum = parseFloat(swap) || 0;
   const contractSize = getContractSize(symbol);
 
   // Compute SL & TP Prices dynamically based on mode
@@ -143,7 +172,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   let slRiskPercent: number | null = null;
   if (entryNum > 0 && finalSLPrice !== null && lotNum > 0) {
     const priceDiff = Math.abs(entryNum - finalSLPrice);
-    slRiskAmount = priceDiff * lotNum * ordersNum * contractSize;
+    slRiskAmount = priceDiff * lotNum * ordersNum * contractSize + commNum - swapNum;
     if (currentBalance > 0) {
       slRiskPercent = (slRiskAmount / currentBalance) * 100;
     }
@@ -154,7 +183,7 @@ export const TradeModal: React.FC<TradeModalProps> = ({
   let tpRewardPercent: number | null = null;
   if (entryNum > 0 && finalTPPrice !== null && lotNum > 0) {
     const priceDiff = Math.abs(finalTPPrice - entryNum);
-    tpRewardAmount = priceDiff * lotNum * ordersNum * contractSize;
+    tpRewardAmount = priceDiff * lotNum * ordersNum * contractSize - commNum + swapNum;
     if (currentBalance > 0) {
       tpRewardPercent = (tpRewardAmount / currentBalance) * 100;
     }
@@ -180,7 +209,19 @@ export const TradeModal: React.FC<TradeModalProps> = ({
     const userPnl = manualPnl !== '' ? parseFloat(manualPnl) : null;
     const activeSymbol = symbol.trim().toUpperCase();
 
-    const metrics = calculateTradeMetrics(entry, exit, lot, direction, finalSLPrice, finalTPPrice, userPnl, activeSymbol);
+    const metrics = calculateTradeMetrics(
+      entry,
+      exit,
+      lot,
+      direction,
+      finalSLPrice,
+      finalTPPrice,
+      userPnl,
+      activeSymbol,
+      orders,
+      commNum,
+      swapNum
+    );
 
     const trade: Trade = {
       id: tradeToEdit ? tradeToEdit.id : `trade-${Date.now()}`,
@@ -197,13 +238,18 @@ export const TradeModal: React.FC<TradeModalProps> = ({
       pnl: metrics.pnl,
       pnlPercent: metrics.pnlPercent,
       outcome: metrics.outcome,
-      rr: metrics.rr
+      rr: metrics.rr,
+      commission: commNum > 0 ? commNum : 0,
+      swap: swapNum !== 0 ? swapNum : 0,
+      strategy,
+      session,
+      chartUrl: chartUrl.trim(),
+      isDeleted: false
     };
 
     onSave(trade);
     onClose();
   };
-
 
   return (
     <div className="modal-overlay open" onClick={(e) => {
@@ -321,6 +367,41 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               />
             </div>
 
+            {/* Strategy & Trading Session */}
+            <div className="form-group">
+              <label htmlFor="field-strategy">
+                <Tag className="w-3.5 h-3.5 inline mr-1 text-indigo-400" /> กลยุทธ์การเทรด (Strategy)
+              </label>
+              <select
+                id="field-strategy"
+                value={strategy}
+                onChange={(e) => setStrategy(e.target.value)}
+              >
+                <option value="Breakout">Breakout (ทะลุแนวรับ-แนวต้าน)</option>
+                <option value="Scalping">Scalping (เก็บสั้น)</option>
+                <option value="Pullback">Pullback / Retest (ย่อรับ)</option>
+                <option value="SMC / ICT">SMC / ICT (Smart Money Concept)</option>
+                <option value="EMA Cross">EMA Cross (ตัดกันของเส้นค่าเฉลี่ย)</option>
+                <option value="Trend Following">Trend Following (ตามเทรนด์)</option>
+                <option value="Custom">อื่นๆ (Custom Setup)</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="field-session">
+                <Globe className="w-3.5 h-3.5 inline mr-1 text-amber-400" /> ช่วงเวลาเทรด (Trading Session)
+              </label>
+              <select
+                id="field-session"
+                value={session}
+                onChange={(e) => setSession(e.target.value)}
+              >
+                <option value="ASIAN">🌏 Asian Session (07:00 - 15:00 น.)</option>
+                <option value="LONDON">🏰 London Session (14:00 - 23:00 น.)</option>
+                <option value="NEW_YORK">🗽 New York Session (20:00 - 04:00 น.)</option>
+                <option value="OVERLAP">🔥 Overlap Session (20:00 - 23:00 น.)</option>
+              </select>
+            </div>
 
             {/* Real-time Leverage & Margin Live Calculator Box */}
             {lotNum > 0 && (
@@ -540,6 +621,35 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               </div>
             )}
 
+            {/* Commission ($) & Swap ($) */}
+            <div className="form-group">
+              <label htmlFor="field-commission">
+                <Percent className="w-3.5 h-3.5 inline mr-1 text-rose-400" /> ค่าคอมมิชชั่น (Commission $)
+              </label>
+              <input
+                type="number"
+                id="field-commission"
+                step="any"
+                placeholder="เช่น 3.50 (ถ้ามี)"
+                value={commission}
+                onChange={(e) => setCommission(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="field-swap">
+                <Clock className="w-3.5 h-3.5 inline mr-1 text-amber-400" /> ค่าข้ามคืน (Swap $)
+              </label>
+              <input
+                type="number"
+                id="field-swap"
+                step="any"
+                placeholder="เช่น -0.50 หรือ +1.20"
+                value={swap}
+                onChange={(e) => setSwap(e.target.value)}
+              />
+            </div>
+
             {/* Order Count */}
             <div className="form-group">
               <label htmlFor="field-order-count">จำนวนการออก Order <span className="required">*</span></label>
@@ -554,16 +664,30 @@ export const TradeModal: React.FC<TradeModalProps> = ({
               />
             </div>
 
+            {/* Chart Image URL */}
+            <div className="form-group full-width">
+              <label htmlFor="field-chart-url">
+                <ImageIcon className="w-3.5 h-3.5 inline mr-1 text-indigo-400" /> ลิงก์รูปภาพกราฟ (Chart Screenshot URL)
+              </label>
+              <input
+                type="url"
+                id="field-chart-url"
+                placeholder="วางลิงก์รูปภาพ เช่น https://s3.tradingview.com/snapshots/... หรือ Imgur link"
+                value={chartUrl}
+                onChange={(e) => setChartUrl(e.target.value)}
+              />
+            </div>
+
             {/* Manual PnL Override */}
-            <div className="form-group">
+            <div className="form-group full-width">
               <label htmlFor="field-pnl">
-                <DollarSign className="w-3.5 h-3.5 inline mr-1" /> กำไร/ขาดทุนสุทธิ (Net PnL)
+                <DollarSign className="w-3.5 h-3.5 inline mr-1" /> กำไร/ขาดทุนสุทธิปรับเอง (Manual PnL Override)
               </label>
               <input
                 type="number"
                 id="field-pnl"
                 step="any"
-                placeholder="เว้นว่างเพื่อให้ระบบคำนวณอัตโนมัติ"
+                placeholder="ปกติเว้นว่างเพื่อให้ระบบคำนวณอัตโนมัติ"
                 value={manualPnl}
                 onChange={(e) => setManualPnl(e.target.value)}
               />

@@ -2,6 +2,8 @@ export type Direction = 'BUY' | 'SELL';
 export type Outcome = 'WIN' | 'LOSS' | 'BREAKEVEN' | 'OPEN';
 export type CurrencyUnit = '$' | '฿' | 'pt';
 
+export type TradingSession = 'ASIAN' | 'LONDON' | 'NEW_YORK' | 'OVERLAP' | 'OTHER';
+
 export interface Trade {
   id: string;
   datetime: string;
@@ -18,6 +20,15 @@ export interface Trade {
   pnlPercent: number;
   outcome: Outcome;
   rr: number;
+
+  // New Enhanced Fields
+  commission?: number;
+  swap?: number;
+  strategy?: string;
+  session?: TradingSession | string;
+  chartUrl?: string;
+  isDeleted?: boolean;
+  deletedAt?: string;
 }
 
 export interface WeeklySummary {

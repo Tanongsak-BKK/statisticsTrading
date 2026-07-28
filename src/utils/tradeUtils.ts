@@ -44,6 +44,17 @@ export function getContractSize(symbol: string): number {
   return 100; // Default contract size
 }
 
+export function detectTradingSession(datetimeStr: string): 'ASIAN' | 'LONDON' | 'NEW_YORK' | 'OVERLAP' {
+  if (!datetimeStr) return 'ASIAN';
+  const d = new Date(datetimeStr);
+  const hours = d.getUTCHours();
+
+  if (hours >= 13 && hours < 16) return 'OVERLAP';
+  if (hours >= 13 && hours < 21) return 'NEW_YORK';
+  if (hours >= 7 && hours < 16) return 'LONDON';
+  return 'ASIAN';
+}
+
 export function calculateTradeMetrics(
   entry: number,
   exit: number | null,
@@ -53,7 +64,9 @@ export function calculateTradeMetrics(
   tp: number | null,
   userPnl: number | null,
   symbol: string = 'XAUUSD',
-  orderCount: number = 1
+  orderCount: number = 1,
+  commission: number = 0,
+  swap: number = 0
 ) {
   const contractSize = getContractSize(symbol);
   const totalLots = lot * (orderCount || 1);
@@ -66,12 +79,15 @@ export function calculateTradeMetrics(
     if (userPnl !== null && !isNaN(userPnl)) {
       pnl = userPnl;
     } else {
+      let grossPnL = 0;
       if (dir === 'BUY') {
-        pnl = (exit - entry) * totalLots * contractSize;
+        grossPnL = (exit - entry) * totalLots * contractSize;
       } else {
-        pnl = (entry - exit) * totalLots * contractSize;
+        grossPnL = (entry - exit) * totalLots * contractSize;
       }
+      pnl = grossPnL - (commission || 0) + (swap || 0);
     }
+
 
 
     if (entry > 0) {

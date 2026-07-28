@@ -24,6 +24,8 @@ export default function Home() {
     isLoaded,
     addOrUpdateTrade,
     deleteTrade,
+    restoreTrade,
+    permanentDeleteTrade,
     clearAllTrades,
     exportJSON,
     importJSON,
@@ -105,6 +107,8 @@ export default function Home() {
           currency={currency}
           onEdit={handleOpenEditModal}
           onDelete={deleteTrade}
+          onRestore={restoreTrade}
+          onPermanentDelete={permanentDeleteTrade}
         />
       </main>
 
