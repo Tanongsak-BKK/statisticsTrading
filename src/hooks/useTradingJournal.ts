@@ -2,40 +2,43 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Trade, CurrencyUnit } from '@/types/trade';
+import { calculateTradeMetrics } from '@/utils/tradeUtils';
 import { firebaseService } from '@/services/firebaseService';
 import { xauusdService, XAUUSDPriceResult } from '@/services/xauusdService';
 import { currencyService, CurrencyRateResult } from '@/services/currencyService';
 
-const STORAGE_KEY = 'statistics_trading_journal_v1';
-const BALANCE_STORAGE_KEY = 'statistics_trading_initial_balance_v1';
-const LEVERAGE_STORAGE_KEY = 'statistics_trading_leverage_v1';
+const STORAGE_KEY = 'statistics_trading_journal_trades';
+const BALANCE_STORAGE_KEY = 'statistics_trading_initial_balance';
+const LEVERAGE_STORAGE_KEY = 'statistics_trading_leverage';
 
 export function useTradingJournal() {
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [currency, setCurrency] = useState<CurrencyUnit>('$');
   const [initialBalance, setInitialBalanceState] = useState<number>(10000);
   const [leverage, setLeverageState] = useState<number>(100);
+  const [currency, setCurrency] = useState<CurrencyUnit>('$');
   const [isLoaded, setIsLoaded] = useState(false);
-
-  // External APIs & Firebase States
   const [xauusdInfo, setXauusdInfo] = useState<XAUUSDPriceResult | null>(null);
   const [usdThbInfo, setUsdThbInfo] = useState<CurrencyRateResult | null>(null);
-  const [isFirebaseActive, setIsFirebaseActive] = useState<boolean>(false);
+  const [isFirebaseActive, setIsFirebaseActive] = useState(false);
 
-  // 1. Initial Load: Load local storage & sync with Firebase if configured
+  // 1. Initial Load: Check LocalStorage & Firebase Firestore
   useEffect(() => {
     async function loadData() {
       try {
         const firebaseConfigured = firebaseService.isConfigured();
         setIsFirebaseActive(firebaseConfigured);
 
-        // Load LocalStorage first (instant)
-        const storedTrades = localStorage.getItem(STORAGE_KEY);
+        // Load local data first
+        const localData = localStorage.getItem(STORAGE_KEY);
         let localTrades: Trade[] = [];
-        if (storedTrades) {
-          localTrades = JSON.parse(storedTrades);
-          setTrades(localTrades);
+        if (localData) {
+          try {
+            localTrades = JSON.parse(localData);
+          } catch (e) {
+            console.error('Error parsing local trades JSON', e);
+          }
         }
+        setTrades(localTrades);
 
         const storedBalance = localStorage.getItem(BALANCE_STORAGE_KEY);
         if (storedBalance !== null) {
@@ -145,17 +148,37 @@ export function useTradingJournal() {
   };
 
   const addOrUpdateTrade = (trade: Trade) => {
+    // Recalculate metrics accurately with symbol contract size and direction-based TP/SL
+    const metrics = calculateTradeMetrics(
+      trade.entryPrice,
+      trade.exitPrice,
+      trade.lotSize,
+      trade.direction,
+      trade.stopLoss,
+      trade.takeProfit,
+      null,
+      trade.symbol
+    );
+
+    const updatedTrade: Trade = {
+      ...trade,
+      pnl: metrics.pnl,
+      pnlPercent: metrics.pnlPercent,
+      outcome: metrics.outcome,
+      rr: metrics.rr
+    };
+
     setTrades(prev => {
-      const existingIndex = prev.findIndex(t => t.id === trade.id);
+      const existingIndex = prev.findIndex(t => t.id === updatedTrade.id);
       let updated: Trade[];
       if (existingIndex >= 0) {
         updated = [...prev];
-        updated[existingIndex] = trade;
+        updated[existingIndex] = updatedTrade;
       } else {
-        updated = [trade, ...prev];
+        updated = [updatedTrade, ...prev];
       }
       if (firebaseService.isConfigured()) {
-        firebaseService.saveTrade(trade);
+        firebaseService.saveTrade(updatedTrade);
       }
       return updated;
     });
@@ -163,7 +186,6 @@ export function useTradingJournal() {
     // Force fetch fresh XAUUSD market price immediately whenever a trade order is entered or updated
     refreshXAUUSD(true);
   };
-
 
   const deleteTrade = (id: string) => {
     setTrades(prev => prev.filter(t => t.id !== id));
@@ -175,11 +197,26 @@ export function useTradingJournal() {
   const clearAllTrades = () => {
     setTrades([]);
     localStorage.removeItem(STORAGE_KEY);
-    // Note: Local clear preserves remote data unless explicitly deleted
   };
 
-  // Calculate Net PnL and Current Balance
-  const totalPnL = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+  // Recalculate Net PnL and Current Balance dynamically across all trades using accurate contract size multipliers
+  const totalPnL = trades.reduce((sum, t) => {
+    if (t.exitPrice !== null && !isNaN(t.exitPrice)) {
+      const metrics = calculateTradeMetrics(
+        t.entryPrice,
+        t.exitPrice,
+        t.lotSize,
+        t.direction,
+        t.stopLoss,
+        t.takeProfit,
+        null,
+        t.symbol
+      );
+      return sum + metrics.pnl;
+    }
+    return sum;
+  }, 0);
+
   const currentBalance = initialBalance + totalPnL;
   const growthPercent = initialBalance > 0 ? (totalPnL / initialBalance) * 100 : 0;
 
@@ -202,32 +239,30 @@ export function useTradingJournal() {
 
   const importJSON = (file: File) => {
     const reader = new FileReader();
-    reader.onload = async (e) => {
+    reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
-
-        let importedTrades: Trade[] = [];
-        if (Array.isArray(parsed)) {
-          importedTrades = parsed;
-        } else if (parsed && typeof parsed === 'object') {
-          if (Array.isArray(parsed.trades)) importedTrades = parsed.trades;
+        if (parsed.trades && Array.isArray(parsed.trades)) {
+          setTrades(parsed.trades);
           if (typeof parsed.initialBalance === 'number') setInitialBalance(parsed.initialBalance);
           if (typeof parsed.leverage === 'number') setLeverage(parsed.leverage);
           if (parsed.currency) setCurrency(parsed.currency);
-        }
 
-        if (importedTrades.length > 0) {
-          setTrades(importedTrades);
           if (firebaseService.isConfigured()) {
-            await firebaseService.saveAllTrades(importedTrades);
+            firebaseService.saveAllTrades(parsed.trades);
+            firebaseService.saveSettings({
+              initialBalance: parsed.initialBalance || initialBalance,
+              leverage: parsed.leverage || leverage,
+              currency: parsed.currency || currency
+            });
           }
-          alert('นำเข้าข้อมูลสำเร็จ!');
+          alert('นำเข้าข้อมูลสำเร็จแล้ว!');
         } else {
-          alert('ไฟล์ JSON รูปแบบไม่ถูกต้อง');
+          alert('รูปแบบไฟล์ JSON ไม่ถูกต้อง');
         }
-      } catch (err: any) {
-        alert('เกิดข้อผิดพลาดในการอ่านไฟล์: ' + err.message);
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดในการนำเข้าไฟล์ JSON');
       }
     };
     reader.readAsText(file);
@@ -235,15 +270,14 @@ export function useTradingJournal() {
 
   return {
     trades,
-    currency,
-    setCurrency,
     initialBalance,
     setInitialBalance,
     leverage,
     setLeverage,
+    currency,
+    setCurrency,
     currentBalance,
     growthPercent,
-    totalPnL,
     isLoaded,
     addOrUpdateTrade,
     deleteTrade,
