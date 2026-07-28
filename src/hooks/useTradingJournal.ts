@@ -21,7 +21,8 @@ function normalizeAndRecalculateTrades(rawTrades: Trade[]): Trade[] {
       trade.stopLoss,
       trade.takeProfit,
       null,
-      trade.symbol
+      trade.symbol,
+      trade.orderCount || 1
     );
     return {
       ...trade,
@@ -32,6 +33,7 @@ function normalizeAndRecalculateTrades(rawTrades: Trade[]): Trade[] {
     };
   });
 }
+
 
 export function useTradingJournal() {
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -182,7 +184,8 @@ export function useTradingJournal() {
       trade.stopLoss,
       trade.takeProfit,
       null,
-      trade.symbol
+      trade.symbol,
+      trade.orderCount || 1
     );
 
     const updatedTrade: Trade = {
@@ -235,12 +238,14 @@ export function useTradingJournal() {
         t.stopLoss,
         t.takeProfit,
         null,
-        t.symbol
+        t.symbol,
+        t.orderCount || 1
       );
       return sum + metrics.pnl;
     }
     return sum;
   }, 0);
+
 
   const currentBalance = initialBalance + totalPnL;
   const growthPercent = initialBalance > 0 ? (totalPnL / initialBalance) * 100 : 0;

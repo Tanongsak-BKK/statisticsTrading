@@ -52,9 +52,11 @@ export function calculateTradeMetrics(
   sl: number | null,
   tp: number | null,
   userPnl: number | null,
-  symbol: string = 'XAUUSD'
+  symbol: string = 'XAUUSD',
+  orderCount: number = 1
 ) {
   const contractSize = getContractSize(symbol);
+  const totalLots = lot * (orderCount || 1);
   let pnl = 0;
   let pnlPercent = 0;
   let outcome: Outcome = 'OPEN';
@@ -65,11 +67,12 @@ export function calculateTradeMetrics(
       pnl = userPnl;
     } else {
       if (dir === 'BUY') {
-        pnl = (exit - entry) * lot * contractSize;
+        pnl = (exit - entry) * totalLots * contractSize;
       } else {
-        pnl = (entry - exit) * lot * contractSize;
+        pnl = (entry - exit) * totalLots * contractSize;
       }
     }
+
 
     if (entry > 0) {
       if (dir === 'BUY') {
