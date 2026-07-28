@@ -182,7 +182,8 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
                                   : 'badge-outcome-be'
                               }`}
                             >
-                              {t.outcome === 'WIN' ? 'WIN' : t.outcome === 'LOSS' ? 'LOSS' : 'BE'}
+                              {t.outcome === 'WIN' ? 'TP (WIN)' : t.outcome === 'LOSS' ? 'SL (LOSS)' : 'BE'}
+
                             </span>
                           </div>
                         </>

@@ -79,10 +79,20 @@ export function calculateTradeMetrics(
       }
     }
 
-    if (pnl > 0.0001) outcome = 'WIN';
-    else if (pnl < -0.0001) outcome = 'LOSS';
-    else outcome = 'BREAKEVEN';
+    // Direction-based TP vs SL outcome comparison:
+    // BUY: Exit > Entry => TP (WIN), Exit < Entry => SL (LOSS)
+    // SELL: Exit < Entry => TP (WIN), Exit > Entry => SL (LOSS)
+    if (dir === 'BUY') {
+      if (exit > entry) outcome = 'WIN';
+      else if (exit < entry) outcome = 'LOSS';
+      else outcome = 'BREAKEVEN';
+    } else {
+      if (exit < entry) outcome = 'WIN';
+      else if (exit > entry) outcome = 'LOSS';
+      else outcome = 'BREAKEVEN';
+    }
   }
+
 
   let rr = 0;
   if (sl && tp && sl !== entry) {
