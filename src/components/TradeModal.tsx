@@ -62,8 +62,9 @@ export const TradeModal: React.FC<TradeModalProps> = ({
       setStopLoss(tradeToEdit.stopLoss !== null ? String(tradeToEdit.stopLoss) : '');
       setTakeProfit(tradeToEdit.takeProfit !== null ? String(tradeToEdit.takeProfit) : '');
       setOrderCount(String(tradeToEdit.orderCount || 1));
-      setManualPnl(tradeToEdit.pnl !== undefined ? String(tradeToEdit.pnl) : '');
+      setManualPnl('');
       setTechnicalNote(tradeToEdit.technicalNote || '');
+
       setSltpMode('PRICE');
       setSlPoints('');
       setTpPoints('');

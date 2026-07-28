@@ -11,6 +11,28 @@ const STORAGE_KEY = 'statistics_trading_journal_trades';
 const BALANCE_STORAGE_KEY = 'statistics_trading_initial_balance';
 const LEVERAGE_STORAGE_KEY = 'statistics_trading_leverage';
 
+function normalizeAndRecalculateTrades(rawTrades: Trade[]): Trade[] {
+  return rawTrades.map(trade => {
+    const metrics = calculateTradeMetrics(
+      trade.entryPrice,
+      trade.exitPrice,
+      trade.lotSize,
+      trade.direction,
+      trade.stopLoss,
+      trade.takeProfit,
+      null,
+      trade.symbol
+    );
+    return {
+      ...trade,
+      pnl: metrics.pnl,
+      pnlPercent: metrics.pnlPercent,
+      outcome: metrics.outcome,
+      rr: metrics.rr
+    };
+  });
+}
+
 export function useTradingJournal() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [initialBalance, setInitialBalanceState] = useState<number>(10000);
@@ -38,7 +60,8 @@ export function useTradingJournal() {
             console.error('Error parsing local trades JSON', e);
           }
         }
-        setTrades(localTrades);
+        const normalizedLocal = normalizeAndRecalculateTrades(localTrades);
+        setTrades(normalizedLocal);
 
         const storedBalance = localStorage.getItem(BALANCE_STORAGE_KEY);
         if (storedBalance !== null) {
@@ -56,11 +79,13 @@ export function useTradingJournal() {
         if (firebaseConfigured) {
           const remoteTrades = await firebaseService.fetchTrades();
           if (remoteTrades && remoteTrades.length > 0) {
-            setTrades(remoteTrades);
+            const normalizedRemote = normalizeAndRecalculateTrades(remoteTrades);
+            setTrades(normalizedRemote);
           } else if (localTrades.length > 0) {
             // Upload local trades to Firebase on first sync
-            await firebaseService.saveAllTrades(localTrades);
+            await firebaseService.saveAllTrades(normalizedLocal);
           }
+
 
           const remoteSettings = await firebaseService.fetchSettings();
           if (remoteSettings) {
