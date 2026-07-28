@@ -8,11 +8,9 @@ export interface CurrencyRateResult {
 }
 
 export const currencyService = {
-  // Fetch USD/THB rate from FreeCurrencyAPI with 1-week caching
+  // Fetch USD/THB rate via internal API route (bypassing CORS) with 1-week caching
   fetchRate: async (forceRefresh = false): Promise<CurrencyRateResult> => {
     try {
-      const apiKey = process.env.NEXT_PUBLIC_FREECURRENCY_API_KEY;
-
       // Check cache first if not forced
       if (!forceRefresh) {
         const cached = localStorage.getItem(CURRENCY_CACHE_KEY);
@@ -25,26 +23,18 @@ export const currencyService = {
         }
       }
 
-      if (!apiKey) {
-        console.log('FreeCurrencyAPI key not configured in .env.local');
-        const cached = localStorage.getItem(CURRENCY_CACHE_KEY);
-        if (cached) return JSON.parse(cached);
-        return { usdThbRate: 36.50, lastUpdated: new Date().toISOString(), isFallback: true };
-      }
-
-      // Fetch from freecurrencyapi.com
-      const res = await fetch(`https://api.freecurrencyapi.com/v1/latest?apikey=${apiKey}&currencies=THB&base_currency=USD`);
+      // Call internal Next.js API route
+      const res = await fetch('/api/currency');
       if (!res.ok) {
-        throw new Error(`FreeCurrencyAPI error: ${res.statusText}`);
+        throw new Error(`API Route error: ${res.status}`);
       }
 
       const data = await res.json();
-      const rate = data?.data?.THB;
-
-      if (rate && !isNaN(rate)) {
+      if (data?.rate && !isNaN(data.rate)) {
         const result: CurrencyRateResult = {
-          usdThbRate: parseFloat(rate),
-          lastUpdated: new Date().toISOString()
+          usdThbRate: Number(data.rate),
+          lastUpdated: new Date().toISOString(),
+          isFallback: Boolean(data.isFallback)
         };
         localStorage.setItem(CURRENCY_CACHE_KEY, JSON.stringify(result));
         return result;
@@ -54,10 +44,11 @@ export const currencyService = {
       if (cached) return JSON.parse(cached);
       return { usdThbRate: 36.50, lastUpdated: new Date().toISOString(), isFallback: true };
     } catch (err) {
-      console.error('Error fetching USD/THB rate from FreeCurrencyAPI:', err);
+      console.error('Error fetching USD/THB rate:', err);
       const cached = localStorage.getItem(CURRENCY_CACHE_KEY);
       if (cached) return JSON.parse(cached);
       return { usdThbRate: 36.50, lastUpdated: new Date().toISOString(), isFallback: true };
     }
   }
+
 };

@@ -11,11 +11,9 @@ export interface XAUUSDPriceResult {
 }
 
 export const xauusdService = {
-  // Fetch Gold price from CommodityPriceAPI with 1-hour interval caching
+  // Fetch Gold price via internal API route (bypassing CORS) with 1-hour interval caching
   fetchPrice: async (forceRefresh = false): Promise<XAUUSDPriceResult | null> => {
     try {
-      const apiKey = process.env.NEXT_PUBLIC_COMMODITY_PRICE_API_KEY;
-
       // Check cache first if not forced
       if (!forceRefresh) {
         const cached = localStorage.getItem(XAUUSD_CACHE_KEY);
@@ -28,39 +26,33 @@ export const xauusdService = {
         }
       }
 
-      if (!apiKey) {
-        console.log('CommodityPriceAPI key not configured in .env.local');
-        return null;
-      }
-
-      // Fetch from commoditypriceapi.com
-      const res = await fetch(`https://commoditypriceapi.com/api/v1/latest?symbol=XAU&api_key=${apiKey}`);
+      // Call internal Next.js API route
+      const res = await fetch('/api/xauusd');
       if (!res.ok) {
-        throw new Error(`API error: ${res.statusText}`);
+        throw new Error(`API Route error: ${res.status}`);
       }
 
       const data = await res.json();
-      // Extract price (handling various response formats from commoditypriceapi)
-      const fetchedPrice = data?.data?.price || data?.data?.rates?.XAU || data?.price;
-      
-      if (fetchedPrice && !isNaN(fetchedPrice)) {
+      if (data?.price && !isNaN(data.price)) {
         const result: XAUUSDPriceResult = {
-          price: parseFloat(fetchedPrice),
+          price: Number(data.price),
           lastUpdated: new Date().toISOString()
         };
         localStorage.setItem(XAUUSD_CACHE_KEY, JSON.stringify(result));
         return result;
       }
 
+      const cached = localStorage.getItem(XAUUSD_CACHE_KEY);
+      if (cached) return JSON.parse(cached);
       return null;
     } catch (err) {
-      console.error('Error fetching XAUUSD price from CommodityPriceAPI:', err);
-      // Return cached fallback if available
+      console.error('Error fetching XAUUSD price:', err);
       const cached = localStorage.getItem(XAUUSD_CACHE_KEY);
       if (cached) return JSON.parse(cached);
       return null;
     }
   },
+
 
   // Auto-check XAUUSD trades against current price for SL/TP hits
   checkAutoSLTP: (trades: Trade[], currentPrice: number): { updatedTrades: Trade[]; hasChanges: boolean } => {
