@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { Trade, CurrencyUnit } from '@/types/trade';
-import { getTradeDateDetails, formatCurrency } from '@/utils/tradeUtils';
-import { Calendar, CalendarDays, Trophy, Wallet, TrendingUp, Edit2 } from 'lucide-react';
+import { getTradeDateDetails, formatCurrency, calculateMaxLot } from '@/utils/tradeUtils';
+import { Calendar, CalendarDays, Trophy, Wallet, TrendingUp, Edit2, Gauge, Layers } from 'lucide-react';
 
 interface KPICardsProps {
   trades: Trade[];
@@ -11,6 +11,7 @@ interface KPICardsProps {
   initialBalance: number;
   currentBalance: number;
   growthPercent: number;
+  leverage: number;
   onOpenBalanceModal: () => void;
 }
 
@@ -20,6 +21,7 @@ export const KPICards: React.FC<KPICardsProps> = ({
   initialBalance,
   currentBalance,
   growthPercent,
+  leverage,
   onOpenBalanceModal
 }) => {
   const now = new Date();
@@ -64,6 +66,9 @@ export const KPICards: React.FC<KPICardsProps> = ({
 
   const growthFormatted = `${growthPercent >= 0 ? '+' : ''}${growthPercent.toFixed(2)}%`;
 
+  // Calculate Max Lot capacity for current balance & leverage
+  const maxLotCapacity = calculateMaxLot(currentBalance, leverage, 1);
+
   return (
     <section className="kpi-grid">
       {/* Current Portfolio Balance */}
@@ -73,9 +78,9 @@ export const KPICards: React.FC<KPICardsProps> = ({
           <button
             onClick={onOpenBalanceModal}
             className="btn-inline-edit"
-            title="ตั้งค่าเงินทุนเริ่มต้น"
+            title="ตั้งค่าเงินทุนและ Leverage"
           >
-            <Edit2 className="w-3.5 h-3.5" /> แก้ไขทุน
+            <Edit2 className="w-3.5 h-3.5" /> แก้ไขทุน & Leverage
           </button>
         </div>
         <div className="kpi-body">
@@ -87,6 +92,25 @@ export const KPICards: React.FC<KPICardsProps> = ({
             <span className={`badge ${growthPercent >= 0 ? 'badge-outcome-win' : 'badge-outcome-loss'}`}>
               {growthFormatted}
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Leverage & Purchasing Power */}
+      <div className="kpi-card highlight-leverage">
+        <div className="kpi-head">
+          <span><Gauge className="inline w-4 h-4 mr-1 text-purple-400" /> Leverage & กำลังออก Lot</span>
+          <span className="badge badge-info">1:{leverage}</span>
+        </div>
+        <div className="kpi-body">
+          <h2>1:{leverage}</h2>
+          <div className="kpi-sub flex justify-between items-center">
+            <span>
+              <Layers className="w-3.5 h-3.5 inline mr-1 text-muted" /> Lot สูงสุดที่ออกได้:
+            </span>
+            <strong className="text-indigo-300">
+              ~{maxLotCapacity > 0 ? maxLotCapacity.toFixed(2) : '0.00'} Lot
+            </strong>
           </div>
         </div>
       </div>
@@ -133,22 +157,6 @@ export const KPICards: React.FC<KPICardsProps> = ({
           </h2>
           <div className="kpi-sub">
             <span>{weekTrades} ออเดอร์ในสัปดาห์นี้</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Month PnL */}
-      <div className="kpi-card highlight-month">
-        <div className="kpi-head">
-          <span><CalendarDays className="inline w-4 h-4 mr-1" /> ยอดรวมเดือนนี้ (This Month)</span>
-          <span className="badge badge-month">{currentDetails.monthYearLabel}</span>
-        </div>
-        <div className="kpi-body">
-          <h2 className={`pnl-val ${monthPnL > 0 ? 'text-success' : monthPnL < 0 ? 'text-danger' : ''}`}>
-            {formatCurrency(monthPnL, currency)}
-          </h2>
-          <div className="kpi-sub">
-            <span>{monthTrades} ออเดอร์ในเดือนนี้</span>
           </div>
         </div>
       </div>

@@ -1,23 +1,30 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Trade, Direction } from '@/types/trade';
-import { calculateTradeMetrics } from '@/utils/tradeUtils';
-import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText } from 'lucide-react';
+import { Trade, Direction, CurrencyUnit } from '@/types/trade';
+import { calculateTradeMetrics, calculateRequiredMargin, calculateMaxLot, formatCurrency } from '@/utils/tradeUtils';
+import { X, Save, Clock, TrendingUp, Layers, ShieldAlert, Target, DollarSign, FileText, Gauge } from 'lucide-react';
 
 interface TradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (trade: Trade) => void;
   tradeToEdit: Trade | null;
+  currentBalance?: number;
+  leverage?: number;
+  currency?: CurrencyUnit;
 }
 
 export const TradeModal: React.FC<TradeModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  tradeToEdit
+  tradeToEdit,
+  currentBalance = 10000,
+  leverage = 100,
+  currency = '$'
 }) => {
+
   const getDefaultDateTime = () => {
     const now = new Date();
     return new Date(now.getTime() - now.getTimezoneOffset() * 60000)
@@ -202,6 +209,31 @@ export const TradeModal: React.FC<TradeModalProps> = ({
                 required
               />
             </div>
+
+            {/* Real-time Leverage & Margin Live Calculator Box */}
+            {parseFloat(lotSize) > 0 && (
+              <div className="form-group full-width margin-calc-box">
+                <div className="flex justify-between items-center flex-wrap gap-2 text-xs">
+                  <span className="flex items-center gap-1.5">
+                    <Gauge className="w-3.5 h-3.5 text-purple-400" /> 
+                    Leverage <strong>1:{leverage}</strong> | หลักประกันที่ใช้ (Margin): 
+                    <strong className="text-indigo-300">
+                      {formatCurrency(calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage), currency)}
+                    </strong> 
+                    ({currentBalance > 0 ? ((calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage) / currentBalance) * 100).toFixed(1) : 0}% ของพอร์ต)
+                  </span>
+                  <span className="text-muted">
+                    Lot สูงสุดที่พอร์ตนี้ออกได้: <strong className="text-emerald-400">~{calculateMaxLot(currentBalance, leverage, parseFloat(entryPrice)).toFixed(2)} Lot</strong>
+                  </span>
+                </div>
+                {calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage) > currentBalance && currentBalance > 0 && (
+                  <p className="text-xs text-danger mt-1 font-semibold flex items-center gap-1">
+                    ⚠️ คำเตือน: หลักประกันที่ต้องใช้ ({formatCurrency(calculateRequiredMargin(parseFloat(lotSize) * (parseInt(orderCount) || 1), parseFloat(entryPrice), leverage), currency)}) เกินยอดเงินที่มีในพอร์ต ({formatCurrency(currentBalance, currency)})!
+                  </p>
+                )}
+              </div>
+            )}
+
 
             {/* Exit Price */}
             <div className="form-group">

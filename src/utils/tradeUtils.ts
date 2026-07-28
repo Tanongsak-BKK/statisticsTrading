@@ -185,3 +185,26 @@ export function getAllTimeStats(trades: Trade[]): AllTimeStats {
     tradesPerDay
   };
 }
+
+export function calculateRequiredMargin(
+  lotSize: number,
+  entryPrice: number,
+  leverage: number,
+  contractSize: number = 100000
+): number {
+  if (!lotSize || lotSize <= 0 || !leverage || leverage <= 0) return 0;
+  const price = entryPrice && entryPrice > 0 ? entryPrice : 1;
+  return (lotSize * contractSize * price) / leverage;
+}
+
+export function calculateMaxLot(
+  balance: number,
+  leverage: number,
+  entryPrice: number,
+  contractSize: number = 100000
+): number {
+  if (!balance || balance <= 0 || !leverage || leverage <= 0) return 0;
+  const price = entryPrice && entryPrice > 0 ? entryPrice : 1;
+  return (balance * leverage) / (contractSize * price);
+}
+

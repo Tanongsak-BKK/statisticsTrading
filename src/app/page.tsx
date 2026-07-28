@@ -17,6 +17,8 @@ export default function Home() {
     setCurrency,
     initialBalance,
     setInitialBalance,
+    leverage,
+    setLeverage,
     currentBalance,
     growthPercent,
     isLoaded,
@@ -67,6 +69,7 @@ export default function Home() {
         initialBalance={initialBalance}
         currentBalance={currentBalance}
         growthPercent={growthPercent}
+        leverage={leverage}
         onOpenBalanceModal={() => setIsBalanceModalOpen(true)}
       />
 
@@ -96,16 +99,22 @@ export default function Home() {
         onClose={() => setIsModalOpen(false)}
         onSave={addOrUpdateTrade}
         tradeToEdit={tradeToEdit}
+        currentBalance={currentBalance}
+        leverage={leverage}
+        currency={currency}
       />
 
-      {/* Initial Balance Modal */}
+      {/* Initial Balance & Leverage Modal */}
       <InitialBalanceModal
         isOpen={isBalanceModalOpen}
         onClose={() => setIsBalanceModalOpen(false)}
         initialBalance={initialBalance}
-        onSave={setInitialBalance}
+        onSaveBalance={setInitialBalance}
+        leverage={leverage}
+        onSaveLeverage={setLeverage}
         currency={currency}
       />
+
 
       {/* Footer */}
       <footer className="app-footer">

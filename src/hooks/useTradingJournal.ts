@@ -5,11 +5,13 @@ import { Trade, CurrencyUnit } from '@/types/trade';
 
 const STORAGE_KEY = 'statistics_trading_journal_v1';
 const BALANCE_STORAGE_KEY = 'statistics_trading_initial_balance_v1';
+const LEVERAGE_STORAGE_KEY = 'statistics_trading_leverage_v1';
 
 export function useTradingJournal() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [currency, setCurrency] = useState<CurrencyUnit>('$');
   const [initialBalance, setInitialBalanceState] = useState<number>(10000);
+  const [leverage, setLeverageState] = useState<number>(100);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load from localStorage on mount
@@ -27,6 +29,14 @@ export function useTradingJournal() {
         const parsedBalance = parseFloat(storedBalance);
         if (!isNaN(parsedBalance)) {
           setInitialBalanceState(parsedBalance);
+        }
+      }
+
+      const storedLeverage = localStorage.getItem(LEVERAGE_STORAGE_KEY);
+      if (storedLeverage !== null) {
+        const parsedLeverage = parseFloat(storedLeverage);
+        if (!isNaN(parsedLeverage) && parsedLeverage > 0) {
+          setLeverageState(parsedLeverage);
         }
       }
     } catch (err) {
@@ -49,6 +59,13 @@ export function useTradingJournal() {
     const val = isNaN(newBalance) || newBalance < 0 ? 0 : newBalance;
     setInitialBalanceState(val);
     localStorage.setItem(BALANCE_STORAGE_KEY, val.toString());
+  };
+
+  // Update leverage and persist
+  const setLeverage = (newLeverage: number) => {
+    const val = isNaN(newLeverage) || newLeverage <= 0 ? 1 : newLeverage;
+    setLeverageState(val);
+    localStorage.setItem(LEVERAGE_STORAGE_KEY, val.toString());
   };
 
   const addOrUpdateTrade = (trade: Trade) => {
@@ -81,6 +98,7 @@ export function useTradingJournal() {
     const exportData = {
       version: 1,
       initialBalance,
+      leverage,
       currency,
       trades
     };
@@ -111,6 +129,9 @@ export function useTradingJournal() {
           if (typeof parsed.initialBalance === 'number') {
             setInitialBalance(parsed.initialBalance);
           }
+          if (typeof parsed.leverage === 'number') {
+            setLeverage(parsed.leverage);
+          }
           if (parsed.currency) {
             setCurrency(parsed.currency);
           }
@@ -131,6 +152,8 @@ export function useTradingJournal() {
     setCurrency,
     initialBalance,
     setInitialBalance,
+    leverage,
+    setLeverage,
     currentBalance,
     growthPercent,
     totalPnL,
@@ -142,4 +165,5 @@ export function useTradingJournal() {
     importJSON
   };
 }
+
 
