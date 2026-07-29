@@ -37,26 +37,29 @@ export const KPICards: React.FC<KPICardsProps> = ({
   let totalRRSum = 0;
   let rrCount = 0;
 
-  trades.forEach(t => {
+  const activeTrades = trades.filter(t => !t.isDeleted);
+
+  activeTrades.forEach(t => {
     const details = getTradeDateDetails(t.datetime);
+    const count = t.orderCount && t.orderCount > 0 ? t.orderCount : 1;
     totalPnL += t.pnl;
 
-    if (t.outcome === 'WIN') wins++;
-    else if (t.outcome === 'LOSS') losses++;
+    if (t.outcome === 'WIN') wins += count;
+    else if (t.outcome === 'LOSS') losses += count;
 
     if (t.rr > 0) {
-      totalRRSum += t.rr;
-      rrCount++;
+      totalRRSum += t.rr * count;
+      rrCount += count;
     }
 
     if (details.weekKey === currentDetails.weekKey) {
       weekPnL += t.pnl;
-      weekTrades++;
+      weekTrades += count;
     }
 
     if (details.monthKey === currentDetails.monthKey) {
       monthPnL += t.pnl;
-      monthTrades++;
+      monthTrades += count;
     }
   });
 

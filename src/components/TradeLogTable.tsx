@@ -34,6 +34,8 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
   // Filter Active vs Deleted trades
   const activeTrades = trades.filter(t => !t.isDeleted);
   const deletedTrades = trades.filter(t => t.isDeleted);
+  const totalActiveOrders = activeTrades.reduce((sum, t) => sum + (t.orderCount && t.orderCount > 0 ? t.orderCount : 1), 0);
+  const totalDeletedOrders = deletedTrades.reduce((sum, t) => sum + (t.orderCount && t.orderCount > 0 ? t.orderCount : 1), 0);
 
   const displayTrades = viewTab === 'ACTIVE' ? activeTrades : deletedTrades;
 
@@ -59,7 +61,7 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
             <h2>
               <List className="inline w-5 h-5 mr-2" /> ตารางบันทึกประวัติการเทรด (Trade Log)
             </h2>
-            <span className="badge badge-info">{activeTrades.length} รายการ</span>
+            <span className="badge badge-info">{activeTrades.length} รายการ ({totalActiveOrders} ไม้)</span>
           </div>
 
           {/* Active vs Trash View Switcher */}
@@ -72,7 +74,7 @@ export const TradeLogTable: React.FC<TradeLogTableProps> = ({
               onChange={() => setViewTab('ACTIVE')}
             />
             <label htmlFor="tab-active" className={viewTab === 'ACTIVE' ? 'label-buy' : ''}>
-              📋 รายการเทรด ({activeTrades.length})
+              📋 รายการเทรด ({activeTrades.length} รายการ / {totalActiveOrders} ไม้)
             </label>
 
             <input

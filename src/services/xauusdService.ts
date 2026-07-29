@@ -63,7 +63,8 @@ export const xauusdService = {
       const symbolUpper = trade.symbol.toUpperCase();
       const isGold = symbolUpper === 'XAUUSD' || symbolUpper === 'GOLD' || symbolUpper === 'XAU';
       
-      if (!isGold) return trade;
+      // Only auto-trigger SL/TP for OPEN trades where exitPrice is null
+      if (!isGold || trade.exitPrice !== null) return trade;
 
       let triggeredExitPrice: number | null = null;
       let triggerReason = '';

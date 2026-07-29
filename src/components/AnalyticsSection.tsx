@@ -10,7 +10,8 @@ import {
 } from '@/utils/tradeUtils';
 import { WeeklyChart } from './WeeklyChart';
 import { MonthlyChart } from './MonthlyChart';
-import { BarChart3, LineChart, ListChecks, Coins } from 'lucide-react';
+import { CalendarPnL } from './CalendarPnL';
+import { BarChart3, LineChart, Calendar as CalendarIcon, ListChecks, Coins } from 'lucide-react';
 
 interface AnalyticsSectionProps {
   trades: Trade[];
@@ -29,7 +30,7 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   currentBalance,
   growthPercent
 }) => {
-  const [activeTab, setActiveTab] = useState<'week' | 'month' | 'all'>('week');
+  const [activeTab, setActiveTab] = useState<'week' | 'month' | 'calendar' | 'all'>('week');
 
   const weeklySummaries = getWeeklySummaries(trades);
   const monthlySummaries = getMonthlySummaries(trades);
@@ -52,6 +53,12 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
             onClick={() => setActiveTab('month')}
           >
             <LineChart className="w-4 h-4" /> สรุปผลรายเดือน (Monthly Total)
+          </button>
+          <button
+            className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`}
+            onClick={() => setActiveTab('calendar')}
+          >
+            <CalendarIcon className="w-4 h-4" /> ปฏิทิน PnL (Calendar PnL)
           </button>
           <button
             className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`}
@@ -223,7 +230,14 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
         </div>
       )}
 
-      {/* Tab 3: All Time Stats & Portfolio Balance Overview */}
+      {/* Tab 3: Calendar PnL Grid */}
+      {activeTab === 'calendar' && (
+        <div className="tab-content active">
+          <CalendarPnL trades={trades} currency={currency} />
+        </div>
+      )}
+
+      {/* Tab 4: All Time Stats & Portfolio Balance Overview */}
       {activeTab === 'all' && (
         <div className="tab-content active">
           <div className="stats-overview-grid">

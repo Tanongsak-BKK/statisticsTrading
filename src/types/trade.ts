@@ -49,6 +49,16 @@ export interface MonthlySummary {
   totalPnL: number;
 }
 
+export interface DailySummary {
+  dateStr: string;
+  totalPnL: number;
+  tradesCount: number;
+  wins: number;
+  losses: number;
+  breakevens: number;
+  trades: Trade[];
+}
+
 export interface AllTimeStats {
   bestTrade: number;
   worstTrade: number;
@@ -57,3 +67,4 @@ export interface AllTimeStats {
   profitFactor: string;
   tradesPerDay: string;
 }
+

@@ -20,9 +20,11 @@ function normalizeAndRecalculateTrades(rawTrades: Trade[]): Trade[] {
       trade.direction,
       trade.stopLoss,
       trade.takeProfit,
-      null,
+      typeof trade.pnl === 'number' ? trade.pnl : null,
       trade.symbol,
-      trade.orderCount || 1
+      trade.orderCount || 1,
+      trade.commission || 0,
+      trade.swap || 0
     );
     return {
       ...trade,
@@ -183,9 +185,11 @@ export function useTradingJournal() {
       trade.direction,
       trade.stopLoss,
       trade.takeProfit,
-      null,
+      typeof trade.pnl === 'number' ? trade.pnl : null,
       trade.symbol,
-      trade.orderCount || 1
+      trade.orderCount || 1,
+      trade.commission || 0,
+      trade.swap || 0
     );
 
     const updatedTrade: Trade = {
@@ -258,21 +262,10 @@ export function useTradingJournal() {
     localStorage.removeItem(STORAGE_KEY);
   };
 
-  // Recalculate Net PnL and Current Balance dynamically across all trades using accurate contract size multipliers
+  // Calculate Net PnL across all active (non-deleted) trades
   const totalPnL = trades.reduce((sum, t) => {
-    if (t.exitPrice !== null && !isNaN(t.exitPrice)) {
-      const metrics = calculateTradeMetrics(
-        t.entryPrice,
-        t.exitPrice,
-        t.lotSize,
-        t.direction,
-        t.stopLoss,
-        t.takeProfit,
-        null,
-        t.symbol,
-        t.orderCount || 1
-      );
-      return sum + metrics.pnl;
+    if (!t.isDeleted && t.exitPrice !== null && !isNaN(t.exitPrice)) {
+      return sum + (t.pnl || 0);
     }
     return sum;
   }, 0);

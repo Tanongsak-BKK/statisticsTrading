@@ -1,4 +1,4 @@
-import { Trade, Direction, Outcome, WeeklySummary, MonthlySummary, AllTimeStats, CurrencyUnit } from '@/types/trade';
+import { Trade, Direction, Outcome, WeeklySummary, MonthlySummary, DailySummary, AllTimeStats, CurrencyUnit } from '@/types/trade';
 
 export function getTradeDateDetails(dateStr: string) {
   const d = new Date(dateStr);
@@ -144,10 +144,12 @@ export function formatCurrency(val: number, currency: CurrencyUnit = '$'): strin
 
 export function getWeeklySummaries(trades: Trade[]): WeeklySummary[] {
   const map: Record<string, WeeklySummary> = {};
+  const activeTrades = trades.filter(t => !t.isDeleted);
 
-  trades.forEach(t => {
+  activeTrades.forEach(t => {
     const details = getTradeDateDetails(t.datetime);
     const key = details.weekKey;
+    const count = t.orderCount && t.orderCount > 0 ? t.orderCount : 1;
 
     if (!map[key]) {
       map[key] = {
@@ -160,10 +162,10 @@ export function getWeeklySummaries(trades: Trade[]): WeeklySummary[] {
       };
     }
 
-    map[key].tradesCount++;
+    map[key].tradesCount += count;
     map[key].totalPnL += t.pnl;
-    if (t.outcome === 'WIN') map[key].wins++;
-    else if (t.outcome === 'LOSS') map[key].losses++;
+    if (t.outcome === 'WIN') map[key].wins += count;
+    else if (t.outcome === 'LOSS') map[key].losses += count;
   });
 
   return Object.keys(map).sort().map(k => map[k]);
@@ -171,10 +173,12 @@ export function getWeeklySummaries(trades: Trade[]): WeeklySummary[] {
 
 export function getMonthlySummaries(trades: Trade[]): MonthlySummary[] {
   const map: Record<string, MonthlySummary> = {};
+  const activeTrades = trades.filter(t => !t.isDeleted);
 
-  trades.forEach(t => {
+  activeTrades.forEach(t => {
     const details = getTradeDateDetails(t.datetime);
     const key = details.monthKey;
+    const count = t.orderCount && t.orderCount > 0 ? t.orderCount : 1;
 
     if (!map[key]) {
       map[key] = {
@@ -187,17 +191,18 @@ export function getMonthlySummaries(trades: Trade[]): MonthlySummary[] {
       };
     }
 
-    map[key].tradesCount++;
+    map[key].tradesCount += count;
     map[key].totalPnL += t.pnl;
-    if (t.outcome === 'WIN') map[key].wins++;
-    else if (t.outcome === 'LOSS') map[key].losses++;
+    if (t.outcome === 'WIN') map[key].wins += count;
+    else if (t.outcome === 'LOSS') map[key].losses += count;
   });
 
   return Object.keys(map).sort().map(k => map[k]);
 }
 
 export function getAllTimeStats(trades: Trade[]): AllTimeStats {
-  if (trades.length === 0) {
+  const activeTrades = trades.filter(t => !t.isDeleted);
+  if (activeTrades.length === 0) {
     return {
       bestTrade: 0,
       worstTrade: 0,
@@ -208,12 +213,12 @@ export function getAllTimeStats(trades: Trade[]): AllTimeStats {
     };
   }
 
-  const pnls = trades.map(t => t.pnl);
+  const pnls = activeTrades.map(t => t.pnl);
   const maxWin = Math.max(...pnls);
   const maxLoss = Math.min(...pnls);
 
-  const winningTrades = trades.filter(t => t.pnl > 0);
-  const losingTrades = trades.filter(t => t.pnl < 0);
+  const winningTrades = activeTrades.filter(t => t.pnl > 0);
+  const losingTrades = activeTrades.filter(t => t.pnl < 0);
 
   const totalWinAmount = winningTrades.reduce((sum, t) => sum + t.pnl, 0);
   const totalLossAmount = Math.abs(losingTrades.reduce((sum, t) => sum + t.pnl, 0));
@@ -225,11 +230,12 @@ export function getAllTimeStats(trades: Trade[]): AllTimeStats {
     ? (totalWinAmount / totalLossAmount).toFixed(2) 
     : (totalWinAmount > 0 ? '∞' : '0.00');
 
-  const dates = trades.map(t => new Date(t.datetime).getTime());
+  const totalActualOrders = activeTrades.reduce((sum, t) => sum + (t.orderCount && t.orderCount > 0 ? t.orderCount : 1), 0);
+  const dates = activeTrades.map(t => new Date(t.datetime).getTime());
   const minDate = Math.min(...dates);
   const maxDate = Math.max(...dates);
   const diffDays = Math.max(1, Math.ceil((maxDate - minDate) / (1000 * 3600 * 24)));
-  const tradesPerDay = (trades.length / diffDays).toFixed(1);
+  const tradesPerDay = (totalActualOrders / diffDays).toFixed(1);
 
   return {
     bestTrade: maxWin > 0 ? maxWin : 0,
@@ -262,4 +268,45 @@ export function calculateMaxLot(
   const price = entryPrice && entryPrice > 0 ? entryPrice : 1;
   return (balance * leverage) / (contractSize * price);
 }
+
+export function getDailyPnLMap(trades: Trade[]): Record<string, DailySummary> {
+  const map: Record<string, DailySummary> = {};
+  const activeTrades = trades.filter(t => !t.isDeleted);
+
+  activeTrades.forEach(t => {
+    if (!t.datetime) return;
+    const d = new Date(t.datetime);
+    if (isNaN(d.getTime())) return;
+
+    // Local date string YYYY-MM-DD
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    const count = t.orderCount && t.orderCount > 0 ? t.orderCount : 1;
+
+    if (!map[dateStr]) {
+      map[dateStr] = {
+        dateStr,
+        totalPnL: 0,
+        tradesCount: 0,
+        wins: 0,
+        losses: 0,
+        breakevens: 0,
+        trades: []
+      };
+    }
+
+    map[dateStr].tradesCount += count;
+    map[dateStr].totalPnL += t.pnl;
+    map[dateStr].trades.push(t);
+
+    if (t.outcome === 'WIN') map[dateStr].wins += count;
+    else if (t.outcome === 'LOSS') map[dateStr].losses += count;
+    else if (t.outcome === 'BREAKEVEN') map[dateStr].breakevens += count;
+  });
+
+  return map;
+}
+
 
